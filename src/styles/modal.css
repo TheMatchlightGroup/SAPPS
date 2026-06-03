@@ -62,9 +62,11 @@
 
 .currency-input { position: relative; display: flex; align-items: center; }
 .currency-prefix {
-  position: absolute; left: 13px; color: var(--ink-700); opacity: 0.6; font-weight: 600;
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--ink-700); opacity: 0.6; font-weight: 600;
+  pointer-events: none; line-height: 1;
 }
-.currency-input input { padding-left: 30px; width: 100%; }
+.currency-input input { padding-left: 28px; width: 100%; }
 
 .total-row {
   display: flex; justify-content: space-between; align-items: baseline;
