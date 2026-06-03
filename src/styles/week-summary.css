@@ -1,0 +1,63 @@
+.week-panel {
+  background: var(--ink-900);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5) var(--s-6);
+  margin-bottom: var(--s-6);
+  box-shadow: var(--shadow-card);
+}
+
+.week-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4); margin-bottom: var(--s-5); flex-wrap: wrap;
+}
+.week-nav { display: flex; align-items: center; gap: var(--s-2); }
+.week-range { color: var(--cream); font-family: var(--font-display); font-size: 1.1rem; font-weight: 600; min-width: 190px; text-align: center; }
+.navbtn.sm { padding: 6px 11px; font-size: 0.85rem; background: var(--ink-700); color: var(--cream); border-color: var(--line-onink); }
+.navbtn.sm:hover { border-color: var(--gold); color: var(--gold-bright); }
+.navbtn.sm.ghost { background: transparent; }
+
+.week-examiner {
+  padding: 8px 12px; border-radius: var(--radius);
+  background: var(--ink-700); color: var(--cream);
+  border: 1px solid var(--line-onink); min-width: 190px;
+}
+.week-examiner:focus { outline: none; border-color: var(--gold); }
+
+.week-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: var(--s-3); margin-bottom: var(--s-5);
+}
+.stat-card {
+  background: rgba(231,205,129,.06);
+  border: 1px solid var(--line-onink);
+  border-radius: var(--radius); padding: var(--s-4);
+  display: flex; flex-direction: column; gap: var(--s-2);
+}
+.stat-label {
+  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--gold); font-weight: 700;
+}
+.stat-value { font-family: var(--font-display); font-size: 1.55rem; font-weight: 600; color: var(--cream); }
+
+.week-submit-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4); flex-wrap: wrap;
+}
+.week-hint { color: rgba(242,238,228,.55); font-size: 0.84rem; max-width: 60ch; }
+.week-hint.done { color: var(--gold-bright); font-weight: 500; }
+.btn-disabled { background: rgba(242,238,228,.08); color: rgba(242,238,228,.4); cursor: not-allowed; }
+
+/* ---- Submission confirmation modal bits (reuses modal.css shell) ---- */
+.week-final-note { margin: 0; line-height: 1.5; color: var(--ink-900); }
+.week-totals { display: flex; flex-direction: column; gap: 8px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--s-4); }
+.week-totals > div { display: flex; justify-content: space-between; font-size: 0.92rem; }
+.week-totals > div span:first-child { color: var(--ink-700); opacity: 0.75; }
+.week-totals-grand { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 2px; font-family: var(--font-display); }
+.week-totals-grand span { font-weight: 700; font-size: 1.05rem; }
+.week-examinees-label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-700); opacity: 0.6; }
+.week-examinees ul { margin: var(--s-2) 0 0; padding-left: var(--s-5); color: var(--ink-900); }
+.week-examinees li { margin-bottom: 3px; }
+
+@media (max-width: 720px) {
+  .week-stats { grid-template-columns: repeat(2, 1fr); }
+}
