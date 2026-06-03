@@ -7,14 +7,16 @@ import { useCalendarData } from '../hooks/useCalendarData'
 import { TEST_TYPE_ABBR } from '../lib/constants'
 import BookingModal from '../components/BookingModal'
 import CompletionModal from '../components/CompletionModal'
+import WeekSummaryPanel from '../components/WeekSummaryPanel'
 import '../styles/calendar.css'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function CalendarPage() {
   const {
-    exams, examiners, examinerName, loading, error,
-    createBooking, fetchIntake, completeExam, deleteExam,
+    exams, examiners, examinerName, intakeByExam, weekSubmissions,
+    loading, error,
+    createBooking, fetchIntake, completeExam, deleteExam, submitWeek,
   } = useCalendarData()
 
   const [view, setView] = useState('month') // 'month' | 'agenda'
@@ -33,6 +35,14 @@ export default function CalendarPage() {
 
   return (
     <div>
+      <WeekSummaryPanel
+        exams={exams}
+        examiners={examiners}
+        intakeByExam={intakeByExam}
+        weekSubmissions={weekSubmissions}
+        submitWeek={submitWeek}
+      />
+
       <div className="cal-toolbar">
         <div className="cal-title"><h2>Polygraph Calendar</h2></div>
         <div className="cal-controls">
