@@ -1,0 +1,104 @@
+/* ---- Toolbar ---- */
+.cal-toolbar {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--s-4); margin-bottom: var(--s-5); flex-wrap: wrap;
+}
+.cal-title h2 { font-size: 1.9rem; }
+.cal-controls { display: flex; align-items: center; gap: var(--s-3); }
+
+.view-toggle {
+  display: inline-flex; background: var(--paper);
+  border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden;
+}
+.view-toggle button {
+  padding: 8px 16px; font-weight: 600; font-size: 0.9rem; color: var(--ink-700);
+}
+.view-toggle button.on { background: var(--ink-900); color: var(--cream); }
+
+/* ---- Month navigation ---- */
+.month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--s-3);
+}
+.month-label { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; }
+.navbtn {
+  padding: 7px 14px; border-radius: var(--radius); font-weight: 600;
+  font-size: 0.88rem; color: var(--ink-700); border: 1px solid var(--line);
+  background: var(--paper);
+}
+.navbtn:hover { border-color: var(--gold-deep); color: var(--ink-900); }
+
+/* ---- Month grid ---- */
+.month-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.dow {
+  background: var(--ink-900); color: var(--gold-bright);
+  text-align: center; padding: 9px 0; font-size: 0.74rem;
+  font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.day-cell {
+  background: var(--paper); min-height: 116px; padding: 7px 8px;
+  cursor: pointer; transition: background .12s ease; display: flex; flex-direction: column;
+}
+.day-cell:hover { background: #fff; }
+.day-cell.muted { background: #efeadd; }
+.day-cell.muted .day-num { opacity: 0.4; }
+.day-cell.today .day-num {
+  background: var(--gold); color: var(--ink-900);
+  border-radius: 50%; width: 24px; height: 24px;
+  display: grid; place-items: center; font-weight: 700;
+}
+.day-num { font-size: 0.82rem; font-weight: 600; margin-bottom: var(--s-1); }
+.day-exams { display: flex; flex-direction: column; gap: 3px; }
+.chip {
+  background: var(--ink-700); color: var(--cream);
+  border-left: 2px solid var(--gold);
+  border-radius: 4px; padding: 2px 6px; font-size: 0.72rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chip.done { background: var(--ok); border-left-color: var(--gold-bright); }
+.chip-time { color: var(--gold-bright); font-weight: 600; margin-right: 5px; }
+.chip-more { font-size: 0.7rem; color: var(--ink-700); font-weight: 600; padding-left: 2px; }
+
+/* ---- Agenda ---- */
+.agenda { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+.agenda-row {
+  display: grid; grid-template-columns: 130px 1fr auto;
+  gap: var(--s-4); align-items: center;
+  padding: 14px var(--s-5); background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.agenda-row:last-child { border-bottom: none; }
+.agenda-row:hover { background: #fff; }
+.agenda-when { display: flex; flex-direction: column; }
+.agenda-date { font-weight: 600; font-size: 0.9rem; }
+.agenda-time { color: var(--gold-deep); font-size: 0.82rem; font-weight: 600; }
+.agenda-main { display: flex; flex-direction: column; gap: 2px; }
+.agenda-name { font-weight: 600; font-size: 1rem; }
+.agenda-meta { color: var(--ink-700); opacity: 0.75; font-size: 0.84rem; }
+.agenda-side { display: flex; align-items: center; gap: var(--s-3); }
+.agenda-examiner { font-size: 0.86rem; color: var(--ink-700); }
+.status-pill {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 999px; font-weight: 700;
+}
+.status-pill.scheduled { background: rgba(196,162,76,.18); color: var(--gold-deep); }
+.status-pill.completed { background: rgba(62,107,79,.16); color: var(--ok); }
+
+/* ---- States ---- */
+.cal-empty { padding: var(--s-8); text-align: center; color: var(--ink-700); opacity: 0.8; }
+.cal-error {
+  background: rgba(155,59,46,.1); border: 1px solid rgba(155,59,46,.4);
+  color: var(--danger); padding: 12px 16px; border-radius: var(--radius); margin-bottom: var(--s-4);
+}
+.link { color: var(--gold-deep); font-weight: 600; }
+.link:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+  .day-cell { min-height: 84px; }
+  .agenda-row { grid-template-columns: 1fr; gap: var(--s-2); }
+  .agenda-side { justify-content: flex-start; }
+}
