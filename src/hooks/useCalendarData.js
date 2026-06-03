@@ -2,19 +2,21 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
-// Central data layer for the calendar: loads exams + examiner roster, and
-// handles create / complete / delete. RLS decides who sees and does what.
+// Central data layer: exams, examiner roster, financials (intake_forms),
+// and week submissions. RLS decides who sees and does what.
 export function useCalendarData() {
   const { user } = useAuth()
   const [exams, setExams] = useState([])
   const [examiners, setExaminers] = useState([])
+  const [intakeByExam, setIntakeByExam] = useState({})
+  const [weekSubmissions, setWeekSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [examRes, examinerRes] = await Promise.all([
+    const [examRes, examinerRes, intakeRes, weekRes] = await Promise.all([
       supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_time, exam_type, organization, duration_minutes, status, examiner_id')
@@ -26,10 +28,23 @@ export function useCalendarData() {
         .eq('role', 'examiner')
         .eq('active', true)
         .order('name', { ascending: true }),
+      supabase
+        .from('intake_forms')
+        .select('exam_id, copay_amount, amount_due_examiner, amount_due_sapps'),
+      supabase
+        .from('week_submissions')
+        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, submitted_at')
+        .order('week_start', { ascending: false }),
     ])
     if (examRes.error) setError(examRes.error.message)
+
+    const intakeMap = {}
+    for (const row of intakeRes.data || []) intakeMap[row.exam_id] = row
+
     setExams(examRes.data || [])
     setExaminers(examinerRes.data || [])
+    setIntakeByExam(intakeMap)
+    setWeekSubmissions(weekRes.data || [])
     setLoading(false)
   }, [])
 
@@ -56,7 +71,6 @@ export function useCalendarData() {
     return { error: null }
   }
 
-  // Existing financials for an exam (so re-opening a completed exam prefills).
   async function fetchIntake(examId) {
     const { data, error } = await supabase
       .from('intake_forms')
@@ -67,8 +81,6 @@ export function useCalendarData() {
     return { data, error: null }
   }
 
-  // Write the 3-part financials and flip the exam to completed.
-  // intake_forms has a unique(exam_id), so upsert handles insert-or-update.
   async function completeExam(exam, financials) {
     const { error: intakeErr } = await supabase
       .from('intake_forms')
@@ -96,7 +108,6 @@ export function useCalendarData() {
     return { error: null }
   }
 
-  // No-shows / cancellations. Cascades to intake_forms via FK on delete cascade.
   async function deleteExam(examId) {
     const { error } = await supabase.from('exams').delete().eq('id', examId)
     if (error) return { error: error.message }
@@ -104,8 +115,31 @@ export function useCalendarData() {
     return { error: null }
   }
 
+  // Insert a week submission. unique(examiner_id, week_start) means a second
+  // submit of the same week is rejected by the DB (23505) — surfaced as a
+  // friendly message; the UI also locks an already-submitted week.
+  async function submitWeek(payload) {
+    const { error } = await supabase.from('week_submissions').insert({
+      examiner_id: payload.examiner_id,
+      examiner_name: payload.examiner_name,
+      week_start: payload.week_start,
+      week_end: payload.week_end,
+      total_exams: payload.total_exams,
+      completed_exams: payload.completed_exams,
+      total_revenue: payload.total_revenue,
+      submitted_by: user?.email ?? null,
+    })
+    if (error) {
+      if (error.code === '23505') return { error: 'This week has already been submitted.' }
+      return { error: error.message }
+    }
+    await load()
+    return { error: null }
+  }
+
   return {
-    exams, examiners, examinerName, loading, error, refetch: load,
-    createBooking, fetchIntake, completeExam, deleteExam,
+    exams, examiners, examinerName, intakeByExam, weekSubmissions,
+    loading, error, refetch: load,
+    createBooking, fetchIntake, completeExam, deleteExam, submitWeek,
   }
 }
