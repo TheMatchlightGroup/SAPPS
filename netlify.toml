@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA fallback: let React Router handle client-side routes (e.g. /payroll)
+# instead of Netlify 404ing on a hard refresh or direct link.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

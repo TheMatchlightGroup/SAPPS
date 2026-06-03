@@ -1,0 +1,70 @@
+/* App shell: deep-teal branded nav chrome over a light working surface */
+.app-shell { min-height: 100%; display: flex; flex-direction: column; }
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--s-6);
+  height: 64px;
+  background: var(--ink-900);
+  border-bottom: 1px solid var(--line-onink);
+}
+.nav-brand { display: flex; align-items: center; gap: var(--s-3); }
+.nav-mark {
+  width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center;
+  border: 1px solid var(--gold); border-radius: 50%;
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-weight: 600; font-size: 0.95rem; letter-spacing: 0.02em;
+}
+.nav-brand h1 {
+  font-size: 1.12rem;
+  color: var(--cream);
+  font-weight: 600;
+}
+.nav-brand .sub { color: var(--gold); font-weight: 500; }
+
+.nav-links { display: flex; align-items: center; gap: var(--s-2); }
+.nav-link {
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  color: rgba(242,238,228,.72);
+  font-weight: 500;
+  font-size: 0.94rem;
+  transition: color .15s ease, background .15s ease;
+}
+.nav-link:hover { color: var(--cream); }
+.nav-link.active { color: var(--ink-900); background: var(--gold); }
+
+.nav-right { display: flex; align-items: center; gap: var(--s-4); }
+.nav-user { color: rgba(242,238,228,.7); font-size: 0.86rem; }
+.nav-user strong { color: var(--cream); font-weight: 600; }
+.role-pill {
+  margin-left: var(--s-2);
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase;
+  background: rgba(231,205,129,.14); color: var(--gold-bright);
+}
+
+.app-main { flex: 1; padding: var(--s-7) var(--s-6); max-width: 1180px; width: 100%; margin: 0 auto; }
+
+/* Stub page styling (placeholder until the real views land) */
+.page-head { margin-bottom: var(--s-6); }
+.page-head h2 { font-size: 1.9rem; }
+.page-head p { margin: var(--s-2) 0 0; opacity: 0.66; max-width: 60ch; }
+.stub-card {
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  padding: var(--s-7);
+  color: var(--ink-700);
+}
+.stub-card .tag {
+  display: inline-block; margin-bottom: var(--s-3);
+  font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gold-deep); font-weight: 700;
+}
+
+.center-screen { min-height: 100%; display: grid; place-items: center; color: var(--ink-700); }

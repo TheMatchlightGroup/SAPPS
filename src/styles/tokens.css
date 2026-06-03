@@ -1,0 +1,42 @@
+/* ============================================================
+   SAPPS brand tokens — single source of truth for color + type.
+   Pulled from the established SAPPS identity (not the spec's
+   generic navy/gold). Everything else references these vars.
+   ============================================================ */
+:root {
+  /* Ink (deep teal-near-black) */
+  --ink-900: #06141A;
+  --ink-800: #0A1D25;
+  --ink-700: #0F2730;
+  --ink-600: #13242C;
+
+  /* Gold */
+  --gold-deep: #7F6114;   /* print / deepest */
+  --gold:      #C4A24C;   /* digital primary */
+  --gold-bright: #E7CD81; /* highlight */
+
+  /* Paper */
+  --offwhite: #F2EEE4;
+  --cream:    #F4EFE2;
+  --paper:    #FBF9F3;    /* lightest working surface */
+
+  /* Functional */
+  --line:        rgba(6, 20, 26, 0.12);
+  --line-strong: rgba(6, 20, 26, 0.22);
+  --line-onink:  rgba(231, 205, 129, 0.18);
+  --danger:      #9B3B2E;
+  --ok:          #3E6B4F;
+
+  /* Type */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Libre Franklin', system-ui, -apple-system, sans-serif;
+
+  /* Spacing scale */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+
+  --radius: 6px;
+  --radius-lg: 12px;
+  --shadow-card: 0 1px 2px rgba(6,20,26,.06), 0 8px 24px rgba(6,20,26,.06);
+  --shadow-ink:  0 12px 40px rgba(6,20,26,.35);
+}
