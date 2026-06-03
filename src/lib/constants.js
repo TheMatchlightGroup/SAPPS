@@ -34,6 +34,7 @@ export const ORGANIZATIONS = {
 
 // value = stored enum value; abbr = short label shown in compact UI.
 export const TEST_TYPES = [
+  { value: 'Pre-Employment', abbr: 'PE' },
   { value: 'Maintenance', abbr: 'MAINT' },
   { value: 'Monitoring', abbr: 'MON' },
   { value: 'Sexual History', abbr: 'SH' },
