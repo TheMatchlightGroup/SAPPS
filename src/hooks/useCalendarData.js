@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
-// Central data layer for the calendar: loads exams and the examiner roster,
-// exposes a refetch, and creates bookings. RLS handles who sees/does what —
-// an admin/office sees all exams; an examiner would see only their own.
+// Central data layer for the calendar: loads exams + examiner roster, and
+// handles create / complete / delete. RLS decides who sees and does what.
 export function useCalendarData() {
   const { user } = useAuth()
   const [exams, setExams] = useState([])
@@ -15,7 +14,6 @@ export function useCalendarData() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-
     const [examRes, examinerRes] = await Promise.all([
       supabase
         .from('exams')
@@ -29,18 +27,14 @@ export function useCalendarData() {
         .eq('active', true)
         .order('name', { ascending: true }),
     ])
-
     if (examRes.error) setError(examRes.error.message)
     setExams(examRes.data || [])
     setExaminers(examinerRes.data || [])
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { load() }, [load])
 
-  // Map examiner_id -> name for display without re-querying.
   const examinerName = useCallback(
     (id) => examiners.find((e) => e.id === id)?.name || 'Unassigned',
     [examiners]
@@ -62,5 +56,56 @@ export function useCalendarData() {
     return { error: null }
   }
 
-  return { exams, examiners, examinerName, loading, error, refetch: load, createBooking }
+  // Existing financials for an exam (so re-opening a completed exam prefills).
+  async function fetchIntake(examId) {
+    const { data, error } = await supabase
+      .from('intake_forms')
+      .select('copay_amount, amount_due_examiner, amount_due_sapps')
+      .eq('exam_id', examId)
+      .maybeSingle()
+    if (error) return { data: null, error: error.message }
+    return { data, error: null }
+  }
+
+  // Write the 3-part financials and flip the exam to completed.
+  // intake_forms has a unique(exam_id), so upsert handles insert-or-update.
+  async function completeExam(exam, financials) {
+    const { error: intakeErr } = await supabase
+      .from('intake_forms')
+      .upsert(
+        {
+          exam_id: exam.id,
+          examiner_id: exam.examiner_id ?? null,
+          copay_amount: Number(financials.copay_amount) || 0,
+          amount_due_examiner: Number(financials.amount_due_examiner) || 0,
+          amount_due_sapps: Number(financials.amount_due_sapps) || 0,
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+        },
+        { onConflict: 'exam_id' }
+      )
+    if (intakeErr) return { error: intakeErr.message }
+
+    const { error: examErr } = await supabase
+      .from('exams')
+      .update({ status: 'completed' })
+      .eq('id', exam.id)
+    if (examErr) return { error: examErr.message }
+
+    await load()
+    return { error: null }
+  }
+
+  // No-shows / cancellations. Cascades to intake_forms via FK on delete cascade.
+  async function deleteExam(examId) {
+    const { error } = await supabase.from('exams').delete().eq('id', examId)
+    if (error) return { error: error.message }
+    await load()
+    return { error: null }
+  }
+
+  return {
+    exams, examiners, examinerName, loading, error, refetch: load,
+    createBooking, fetchIntake, completeExam, deleteExam,
+  }
 }
