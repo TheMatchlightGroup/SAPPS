@@ -64,9 +64,10 @@
 .currency-prefix {
   position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
   color: var(--ink-700); opacity: 0.6; font-weight: 600;
-  pointer-events: none; line-height: 1;
+  pointer-events: none; line-height: 1; z-index: 1;
 }
-.currency-input input { padding-left: 28px; width: 100%; }
+/* Scoped under .field so it beats the base `.field input` padding rule. */
+.field .currency-input input { padding-left: 32px; width: 100%; }
 
 .total-row {
   display: flex; justify-content: space-between; align-items: baseline;
