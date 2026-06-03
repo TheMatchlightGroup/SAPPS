@@ -6,31 +6,35 @@ import {
 import { useCalendarData } from '../hooks/useCalendarData'
 import { TEST_TYPE_ABBR } from '../lib/constants'
 import BookingModal from '../components/BookingModal'
+import CompletionModal from '../components/CompletionModal'
 import '../styles/calendar.css'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function CalendarPage() {
-  const { exams, examiners, examinerName, loading, error, createBooking } = useCalendarData()
+  const {
+    exams, examiners, examinerName, loading, error,
+    createBooking, fetchIntake, completeExam, deleteExam,
+  } = useCalendarData()
+
   const [view, setView] = useState('month') // 'month' | 'agenda'
   const [cursor, setCursor] = useState(new Date())
-  const [modalDate, setModalDate] = useState(null) // non-null => modal open
+  const [modal, setModal] = useState(null) // { type:'new', date } | { type:'complete', exam }
 
-  // exam_date -> exams[] for fast day-cell lookup
   const examsByDate = useMemo(() => {
     const map = {}
     for (const ex of exams) (map[ex.exam_date] ||= []).push(ex)
     return map
   }, [exams])
 
-  const openNew = (dateISO) => setModalDate(dateISO || format(new Date(), 'yyyy-MM-dd'))
+  const openNew = (dateISO) => setModal({ type: 'new', date: dateISO || format(new Date(), 'yyyy-MM-dd') })
+  const openComplete = (exam) => setModal({ type: 'complete', exam })
+  const closeModal = () => setModal(null)
 
   return (
     <div>
       <div className="cal-toolbar">
-        <div className="cal-title">
-          <h2>Polygraph Calendar</h2>
-        </div>
+        <div className="cal-title"><h2>Polygraph Calendar</h2></div>
         <div className="cal-controls">
           <div className="view-toggle">
             <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
@@ -47,25 +51,35 @@ export default function CalendarPage() {
         <MonthView
           cursor={cursor} setCursor={setCursor}
           examsByDate={examsByDate} examinerName={examinerName}
-          onDayClick={openNew}
+          onDayClick={openNew} onExamClick={openComplete}
         />
       ) : (
-        <AgendaView exams={exams} examinerName={examinerName} onNew={() => openNew()} />
+        <AgendaView exams={exams} examinerName={examinerName} onNew={() => openNew()} onExamClick={openComplete} />
       )}
 
-      {modalDate && (
+      {modal?.type === 'new' && (
         <BookingModal
           examiners={examiners}
-          defaultDate={modalDate}
-          onClose={() => setModalDate(null)}
+          defaultDate={modal.date}
+          onClose={closeModal}
           onCreate={createBooking}
+        />
+      )}
+      {modal?.type === 'complete' && (
+        <CompletionModal
+          exam={modal.exam}
+          examinerName={examinerName}
+          fetchIntake={fetchIntake}
+          onComplete={completeExam}
+          onDelete={deleteExam}
+          onClose={closeModal}
         />
       )}
     </div>
   )
 }
 
-function MonthView({ cursor, setCursor, examsByDate, examinerName, onDayClick }) {
+function MonthView({ cursor, setCursor, examsByDate, examinerName, onDayClick, onExamClick }) {
   const days = useMemo(() => {
     const gridStart = startOfWeek(startOfMonth(cursor))
     const gridEnd = endOfWeek(endOfMonth(cursor))
@@ -88,15 +102,13 @@ function MonthView({ cursor, setCursor, examsByDate, examinerName, onDayClick })
           const muted = !isSameMonth(day, cursor)
           const today = isSameDay(day, new Date())
           return (
-            <div
-              key={iso}
-              className={`day-cell${muted ? ' muted' : ''}${today ? ' today' : ''}`}
-              onClick={() => onDayClick(iso)}
-            >
+            <div key={iso} className={`day-cell${muted ? ' muted' : ''}${today ? ' today' : ''}`}
+              onClick={() => onDayClick(iso)}>
               <span className="day-num">{format(day, 'd')}</span>
               <div className="day-exams">
                 {dayExams.slice(0, 3).map((ex) => (
                   <div key={ex.id} className={`chip${ex.status === 'completed' ? ' done' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); onExamClick(ex) }}
                     title={`${ex.client_name} • ${ex.exam_type} • ${examinerName(ex.examiner_id)}`}>
                     <span className="chip-time">{ex.exam_time?.slice(0, 5)}</span>
                     {ex.client_name}
@@ -112,7 +124,7 @@ function MonthView({ cursor, setCursor, examsByDate, examinerName, onDayClick })
   )
 }
 
-function AgendaView({ exams, examinerName, onNew }) {
+function AgendaView({ exams, examinerName, onNew, onExamClick }) {
   if (exams.length === 0) {
     return (
       <div className="cal-empty">
@@ -123,7 +135,7 @@ function AgendaView({ exams, examinerName, onNew }) {
   return (
     <div className="agenda">
       {exams.map((ex) => (
-        <div key={ex.id} className="agenda-row">
+        <div key={ex.id} className="agenda-row" onClick={() => onExamClick(ex)}>
           <div className="agenda-when">
             <span className="agenda-date">{format(parseISO(ex.exam_date), 'EEE, MMM d')}</span>
             <span className="agenda-time">{ex.exam_time?.slice(0, 5)}</span>
