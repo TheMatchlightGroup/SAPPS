@@ -42,3 +42,44 @@
 .btn-text:hover { background: var(--line); }
 
 @media (max-width: 520px) { .field-row { grid-template-columns: 1fr; } }
+
+/* ---- Completion modal additions ---- */
+.chip { cursor: pointer; }
+.agenda-row { cursor: pointer; }
+
+.exam-summary {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: var(--s-4);
+}
+.summary-name { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; margin-bottom: var(--s-3); }
+.summary-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px var(--s-4); font-size: 0.88rem; }
+.summary-grid span:nth-child(odd) { color: var(--ink-700); opacity: 0.6; font-weight: 600; }
+.summary-flag {
+  margin-top: var(--s-3); font-size: 0.78rem; font-weight: 600;
+  color: var(--ok); background: rgba(62,107,79,.12);
+  padding: 5px 9px; border-radius: var(--radius); display: inline-block;
+}
+
+.currency-input { position: relative; display: flex; align-items: center; }
+.currency-prefix {
+  position: absolute; left: 13px; color: var(--ink-700); opacity: 0.6; font-weight: 600;
+}
+.currency-input input { padding-left: 26px; width: 100%; }
+
+.total-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: var(--s-3) var(--s-1) 0; margin-top: var(--s-2);
+  border-top: 1px solid var(--line);
+  font-family: var(--font-display);
+}
+.total-row span:first-child { font-weight: 600; color: var(--ink-700); }
+.total-row span:last-child { font-size: 1.3rem; font-weight: 700; color: var(--ink-900); }
+
+.completion-foot { justify-content: space-between; align-items: center; }
+.foot-right { display: flex; gap: var(--s-3); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.1); }
+.btn-danger-text { background: transparent; color: var(--danger); font-weight: 600; }
+.btn-danger-text:hover:not(:disabled) { background: rgba(155,59,46,.08); }
+.confirm-delete { display: flex; align-items: center; gap: var(--s-3); width: 100%; justify-content: flex-end; }
+.confirm-delete span { font-size: 0.86rem; color: var(--danger); margin-right: auto; }
