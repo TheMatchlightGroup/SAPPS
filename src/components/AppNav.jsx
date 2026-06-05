@@ -30,6 +30,14 @@ export default function AppNav() {
               Payroll
             </Link>
           )}
+          {showPayroll && (
+            <Link
+              to="/invoicing"
+              className={`nav-link ${pathname === '/invoicing' ? 'active' : ''}`}
+            >
+              Invoicing
+            </Link>
+          )}
         </div>
 
         {profile && (
