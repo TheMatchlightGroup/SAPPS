@@ -5,6 +5,7 @@ import AppNav from './components/AppNav'
 import LoginPage from './pages/LoginPage'
 import CalendarPage from './pages/CalendarPage'
 import PayrollPage from './pages/PayrollPage'
+import InvoicePage from './pages/InvoicePage'
 
 // Authenticated shell: nav + routed content.
 function AppLayout() {
@@ -38,6 +39,14 @@ export default function App() {
               element={
                 <ProtectedRoute requireRole="payroll_admin">
                   <PayrollPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/invoicing"
+              element={
+                <ProtectedRoute requireRole="payroll_admin">
+                  <InvoicePage />
                 </ProtectedRoute>
               }
             />
