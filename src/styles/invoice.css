@@ -1,24 +1,151 @@
 .invoice-screen { display: flex; flex-direction: column; gap: var(--s-5); }
 
-/* ---- Controls (screen only) ---- */
-.invoice-controls {
-  display: flex; align-items: flex-end; gap: var(--s-4); flex-wrap: wrap;
-  background: var(--ink-900); border-radius: var(--radius-lg);
-  padding: var(--s-5) var(--s-6);
+/* =========================================================
+   WORKLIST — big type, plain language, one job per row.
+   Tuned for a less-tech-comfortable user: large targets,
+   status shown as color AND words, generous spacing.
+   ========================================================= */
+.wl-month-bar {
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-2) 0;
 }
-.invoice-controls .control { display: flex; flex-direction: column; gap: var(--s-2); }
-.invoice-controls label {
-  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--gold); font-weight: 700;
+.wl-arrow {
+  width: 52px; height: 52px; border-radius: var(--radius-lg);
+  background: #fff; border: 1.5px solid var(--line-strong);
+  font-size: 1.7rem; line-height: 1; color: var(--ink-900);
+  display: grid; place-items: center; transition: border-color .12s ease, transform .06s ease;
 }
-.invoice-controls select, .invoice-controls input {
-  padding: 10px 13px; border-radius: var(--radius); min-width: 240px;
-  background: var(--ink-700); color: var(--cream); border: 1px solid var(--line-onink);
+.wl-arrow:hover { border-color: var(--gold); }
+.wl-arrow:active { transform: translateY(1px); }
+.wl-month-label { font-family: var(--font-display); font-size: 1.9rem; font-weight: 600; letter-spacing: -0.01em; }
+.wl-thismonth {
+  margin-left: var(--s-2); padding: 9px 16px; border-radius: 999px;
+  background: rgba(196,162,76,.16); color: var(--gold-deep);
+  font-size: 0.95rem; font-weight: 600;
 }
-.invoice-controls select:focus, .invoice-controls input:focus { outline: none; border-color: var(--gold); }
-.btn.big { padding: 13px 24px; font-size: 1rem; margin-left: auto; }
+.wl-thismonth:hover { background: rgba(196,162,76,.28); }
 
-/* ---- The invoice sheet ---- */
+.wl-summary { font-size: 1.15rem; line-height: 1.5; color: var(--ink-700); margin: 0; }
+.wl-summary strong { color: var(--gold-deep); }
+
+.wl-empty {
+  background: var(--paper); border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-lg); padding: var(--s-7) var(--s-5);
+  text-align: center; font-size: 1.1rem; color: var(--ink-700);
+}
+
+.wl-list { display: flex; flex-direction: column; gap: var(--s-3); }
+.wl-row {
+  display: flex; align-items: center; gap: var(--s-4);
+  width: 100%; text-align: left;
+  background: var(--paper); border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg); padding: var(--s-5) var(--s-5);
+  transition: border-color .12s ease, box-shadow .15s ease, transform .06s ease;
+}
+.wl-row:hover { border-color: var(--gold); box-shadow: 0 4px 16px rgba(6,20,26,.08); }
+.wl-row:active { transform: translateY(1px); }
+.wl-row:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.wl-row.sent { background: var(--offwhite); opacity: 0.72; }
+
+.wl-row-main { flex: 1; min-width: 0; }
+.wl-row-name { display: block; font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; color: var(--ink-900); margin-bottom: 4px; }
+.wl-row-sub { display: block; font-size: 1.05rem; color: var(--ink-700); }
+.wl-row-sub strong { color: var(--ink-900); font-variant-numeric: tabular-nums; }
+
+.wl-pill {
+  font-size: 0.95rem; font-weight: 600; padding: 8px 16px;
+  border-radius: 999px; white-space: nowrap; flex: none;
+}
+.wl-pill.ready { background: rgba(196,162,76,.18); color: var(--gold-deep); }
+.wl-pill.sent { background: rgba(62,107,79,.14); color: var(--ok); }
+.wl-chev { font-size: 1.9rem; color: var(--gold); font-weight: 700; flex: none; line-height: 1; }
+
+.wl-divider { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-3); }
+.wl-divider::before, .wl-divider::after { content: ''; height: 1px; flex: 1; background: var(--line); }
+.wl-divider span {
+  font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-700); opacity: 0.6;
+}
+
+/* =========================================================
+   INVOICE VIEW chrome (screen only) — wraps the sheet.
+   ========================================================= */
+.iv-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
+.iv-back { font-size: 1.1rem; font-weight: 600; color: var(--ink-700); padding: 8px 0; }
+.iv-back:hover { color: var(--gold-deep); }
+.iv-context { font-family: var(--font-display); font-size: 1.1rem; color: var(--ink-900); }
+
+.iv-error {
+  background: rgba(155,59,46,.1); border: 1px solid rgba(155,59,46,.4);
+  color: var(--danger); padding: var(--s-3) var(--s-4); border-radius: var(--radius); font-size: 0.95rem;
+}
+
+.iv-fixrow { display: flex; justify-content: flex-end; }
+.btn-fix {
+  background: transparent; color: var(--gold-deep);
+  border: 1.5px solid var(--gold); border-radius: var(--radius);
+  padding: 10px 18px; font-size: 1rem; font-weight: 600;
+  transition: background .12s ease, color .12s ease;
+}
+.btn-fix:hover { background: rgba(196,162,76,.12); }
+.btn-fix.on { background: var(--gold); color: var(--ink-900); }
+
+/* Big plain-verb action buttons */
+.iv-actions { display: flex; gap: var(--s-4); }
+.btn-xl {
+  flex: 1; min-height: 62px; border-radius: var(--radius-lg);
+  font-size: 1.15rem; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  transition: filter .12s ease, transform .06s ease;
+}
+.btn-xl:active { transform: translateY(1px); }
+.btn-xl:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-xl.print { background: #fff; color: var(--ink-900); border: 2px solid var(--ink-900); }
+.btn-xl.print:hover:not(:disabled) { background: var(--paper); }
+.btn-xl.email { background: var(--ink-900); color: var(--cream); }
+.btn-xl.email:hover:not(:disabled) { filter: brightness(1.15); }
+.btn-xl.ghost { background: transparent; color: var(--ink-700); border: 1.5px solid var(--line-strong); flex: 0 0 auto; padding: 0 24px; }
+
+.iv-marksent { display: flex; flex-direction: column; align-items: center; gap: var(--s-2); }
+.btn-marksent {
+  width: 100%; min-height: 60px; border-radius: var(--radius-lg);
+  background: var(--gold); color: var(--ink-900);
+  font-size: 1.15rem; font-weight: 700; transition: filter .12s ease, transform .06s ease;
+}
+.btn-marksent:hover:not(:disabled) { filter: brightness(1.06); }
+.btn-marksent:active { transform: translateY(1px); }
+.btn-marksent:disabled { opacity: 0.45; cursor: not-allowed; }
+.iv-hint { font-size: 0.95rem; color: var(--ink-700); opacity: 0.7; }
+
+/* Sent confirmation strip */
+.iv-sentstrip {
+  display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  background: rgba(62,107,79,.1); border: 1.5px solid var(--ok);
+  border-radius: var(--radius-lg); padding: var(--s-4) var(--s-5);
+}
+.iv-sent-check { width: 40px; height: 40px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 1.3rem; flex: none; }
+.iv-sent-text { flex: 1; font-size: 1.1rem; font-weight: 600; color: var(--ink-900); }
+.iv-sent-actions { display: flex; align-items: center; gap: var(--s-4); }
+.iv-undo { font-size: 1rem; font-weight: 600; color: var(--ink-700); text-decoration: underline; padding: 8px; }
+.iv-undo:hover { color: var(--danger); }
+.iv-sentstrip .btn-xl.print { min-height: 48px; flex: 0 0 auto; padding: 0 18px; font-size: 1rem; }
+
+/* Email panel */
+.email-panel {
+  background: var(--paper); border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg); padding: var(--s-5) var(--s-5) var(--s-4);
+}
+.email-panel-title { font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; margin-bottom: var(--s-3); }
+.email-panel-label { font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-700); opacity: 0.65; margin: var(--s-3) 0 4px; }
+.email-panel-to { font-size: 1.05rem; font-weight: 600; }
+.email-panel-subject { font-size: 1.05rem; font-weight: 600; }
+.email-panel-hint { margin-top: var(--s-3); font-size: 0.95rem; color: var(--ink-700); opacity: 0.8; }
+.email-panel-warn { font-size: 1.05rem; color: var(--danger); }
+.email-panel-actions { display: flex; gap: var(--s-4); margin-top: var(--s-5); }
+
+/* =========================================================
+   THE INVOICE SHEET — unchanged; this is what prints.
+   ========================================================= */
 .invoice-sheet {
   background: #fff; color: var(--ink-900);
   max-width: 850px; margin: 0 auto; width: 100%;
@@ -89,8 +216,12 @@
 @media print {
   @page { margin: 0.5in; }
   body { background: #fff; }
-  .app-nav, .invoice-controls { display: none !important; }
+  .app-nav, .invoice-controls,
+  .wl-month-bar, .wl-summary, .wl-list, .wl-divider, .wl-empty,
+  .iv-topbar, .iv-error, .iv-fixrow, .iv-actions, .iv-marksent,
+  .iv-sentstrip, .email-panel { display: none !important; }
   .app-main { padding: 0 !important; max-width: none !important; }
+  .invoice-screen { gap: 0; }
   .invoice-sheet {
     border: none; box-shadow: none; border-radius: 0;
     max-width: none; padding: 0;
@@ -99,38 +230,13 @@
   .inv-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
+/* ---- Responsive ---- */
 @media (max-width: 620px) {
   .invoice-sheet { padding: var(--s-5); }
   .inv-meta-row { flex-direction: column; gap: var(--s-4); }
   .inv-meta { text-align: left; }
-}
-
-/* ---- Entity directory ---- */
-.dir-caption { color: rgba(242,238,228,.6); font-size: 0.9rem; align-self: center; }
-.back-btn { color: var(--cream); }
-
-.entity-list { display: flex; flex-direction: column; gap: var(--s-2); }
-.entity-row {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%; text-align: left; gap: var(--s-4);
-  background: var(--paper); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: var(--s-4) var(--s-5);
-  transition: border-color .12s ease, transform .06s ease, background .12s ease;
-}
-.entity-row:hover { border-color: var(--gold-deep); background: #fff; }
-.entity-row:active { transform: translateY(1px); }
-.entity-main { display: flex; align-items: baseline; gap: var(--s-3); min-width: 0; }
-.entity-name { font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; color: var(--ink-900); }
-.entity-code {
-  font-size: 0.68rem; letter-spacing: 0.06em; font-weight: 700; color: var(--gold-deep);
-  background: rgba(196,162,76,.16); padding: 2px 8px; border-radius: 999px; flex: none;
-}
-.entity-meta { display: flex; align-items: center; gap: var(--s-5); flex: none; }
-.entity-count { font-size: 0.86rem; color: var(--ink-700); opacity: 0.7; }
-.entity-due { font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; color: var(--ink-900); font-variant-numeric: tabular-nums; }
-.entity-chev { color: var(--gold-deep); font-size: 1.1rem; }
-
-@media (max-width: 560px) {
-  .entity-row { flex-direction: column; align-items: flex-start; gap: var(--s-2); }
-  .entity-meta { gap: var(--s-3); }
+  .wl-month-label { font-size: 1.5rem; }
+  .iv-actions { flex-direction: column; }
+  .wl-row { padding: var(--s-4); }
+  .wl-row-name { font-size: 1.2rem; }
 }
