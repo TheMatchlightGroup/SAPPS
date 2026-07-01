@@ -1,25 +1,31 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { computeMonthClose } from '../lib/monthClose'
 
-// Loads completed exams + their financials, plus the `invoices` table so the
-// worklist knows what's already been sent. Amount of Exam = examiner
-// commission + office use (the price the examiner entered); Copay is what the
-// examinee paid; Total Due from the org = Amount - Copay.
+// Loads exams + their financials, plus the `invoices` table so the worklist
+// knows what's already been sent. Amount of Exam = examiner commission +
+// office use (the price the examiner entered); Copay is what the examinee
+// paid; Total Due from the org = Amount - Copay.
+//
+// Also loads examiners + week submissions so the worklist can warn when
+// payroll data for the month isn't fully in yet (exams could still arrive).
 export function useInvoiceData() {
-  const [exams, setExams] = useState([])
+  const [allExams, setAllExams] = useState([])       // every status — for the payroll check
+  const [exams, setExams] = useState([])             // completed only — invoice lines
   const [intakeByExam, setIntakeByExam] = useState({})
-  const [sentByKey, setSentByKey] = useState({}) // `${organization}__${month}` -> invoice row
+  const [sentByKey, setSentByKey] = useState({})     // `${organization}__${month}` -> invoice row
+  const [submissions, setSubmissions] = useState([])
+  const [examiners, setExaminers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [examRes, intakeRes, invRes] = await Promise.all([
+    const [examRes, intakeRes, invRes, weekRes, userRes] = await Promise.all([
       supabase
         .from('exams')
-        .select('id, client_name, exam_date, exam_type, organization, status')
-        .eq('status', 'completed')
+        .select('id, client_name, exam_date, exam_type, organization, status, examiner_id')
         .order('exam_date', { ascending: true }),
       supabase
         .from('intake_forms')
@@ -27,6 +33,12 @@ export function useInvoiceData() {
       supabase
         .from('invoices')
         .select('id, organization, month, invoice_no, method, sent_at, sent_by'),
+      supabase
+        .from('week_submissions')
+        .select('examiner_id, week_start, week_end'),
+      supabase
+        .from('users')
+        .select('id, name, email, role, active'),
     ])
     if (examRes.error) setError(examRes.error.message)
 
@@ -36,9 +48,13 @@ export function useInvoiceData() {
     const sent = {}
     for (const r of invRes.data || []) sent[`${r.organization}__${r.month}`] = r
 
-    setExams(examRes.data || [])
+    const all = examRes.data || []
+    setAllExams(all)
+    setExams(all.filter((e) => e.status === 'completed'))
     setIntakeByExam(map)
     setSentByKey(sent)
+    setSubmissions(weekRes.data || [])
+    setExaminers((userRes.data || []).filter((u) => u.role === 'examiner' && u.active))
     setLoading(false)
   }, [])
 
@@ -46,6 +62,12 @@ export function useInvoiceData() {
 
   // Organizations that actually have completed exams (for the picker).
   const billableOrgs = [...new Set(exams.map((e) => e.organization))].sort()
+
+  // Payroll month-close status — used for the "totals may still grow" note.
+  const monthCloseFor = useCallback(
+    (month) => computeMonthClose({ exams: allExams, submissions, examiners, month }),
+    [allExams, submissions, examiners]
+  )
 
   // The invoice row for an org+month, or null if it hasn't been sent.
   const sentStatus = useCallback(
@@ -88,6 +110,6 @@ export function useInvoiceData() {
 
   return {
     exams, intakeByExam, billableOrgs, loading, error, refetch: load,
-    sentStatus, markInvoiceSent, unmarkInvoiceSent,
+    sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor,
   }
 }
