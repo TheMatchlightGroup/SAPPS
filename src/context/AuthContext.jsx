@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
@@ -8,11 +8,17 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null) // row from public.users
   const [loading, setLoading] = useState(true)
 
+  // The user id whose profile is currently loaded — lets us skip redundant
+  // reloads when auth events fire for the same signed-in user (e.g.
+  // TOKEN_REFRESHED), which otherwise happen constantly.
+  const loadedUserId = useRef(null)
+
   // Load the caller's profile row; create it (as examiner) if it doesn't
   // exist yet. This replaces the auth.users trigger — profile creation now
   // happens here, on sign-in, where errors are visible.
   const loadProfile = useCallback(async (user) => {
     if (!user) {
+      loadedUserId.current = null
       setProfile(null)
       return
     }
@@ -52,22 +58,39 @@ export function AuthProvider({ children }) {
       data = res.data
     }
 
+    loadedUserId.current = data ? user.id : null
     setProfile(data ?? null)
   }, [])
 
   useEffect(() => {
     let active = true
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    // Initial boot: read the stored session, then load the profile.
+    // `finally` guarantees the loading screen always clears, even if the
+    // profile read fails — a network hiccup should degrade, not strand.
+    supabase.auth.getSession().then(({ data }) => {
       if (!active) return
       setSession(data.session)
-      await loadProfile(data.session?.user)
-      setLoading(false)
+      loadProfile(data.session?.user).finally(() => {
+        if (active) setLoading(false)
+      })
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    // IMPORTANT: supabase-js holds an internal auth lock while it runs this
+    // callback. Awaiting a Supabase query in here (the query needs that same
+    // lock to fetch the access token) deadlocks the client — the classic
+    // "app hangs on Loading… until you refresh" bug. So: do synchronous
+    // state updates only, and defer any data fetching out of the callback
+    // with setTimeout so the lock is released first.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession)
-      await loadProfile(newSession?.user)
+
+      const uid = newSession?.user?.id ?? null
+      if (uid === loadedUserId.current) return // same user; token refresh etc.
+
+      setTimeout(() => {
+        if (active) loadProfile(newSession?.user)
+      }, 0)
     })
 
     return () => {
