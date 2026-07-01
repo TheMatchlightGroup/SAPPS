@@ -16,9 +16,15 @@ function shiftMonth(ym, delta) {
 }
 
 export default function InvoicePage() {
-  const { exams, intakeByExam, loading, sentStatus, markInvoiceSent, unmarkInvoiceSent } = useInvoiceData()
+  const { exams, intakeByExam, loading, sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor } = useInvoiceData()
   const [month, setMonth] = useState(thisMonth())
   const [selectedOrg, setSelectedOrg] = useState(null)
+
+  // Examiners who haven't finished this month — invoices could still grow.
+  const payrollOutstanding = useMemo(
+    () => monthCloseFor(month).outstanding,
+    [monthCloseFor, month]
+  )
 
   const amountOf = (e) => {
     const f = intakeByExam[e.id] || {}
@@ -86,6 +92,18 @@ export default function InvoicePage() {
         <div className="wl-empty">No completed exams in {monthLabel}. Use the arrows to pick another month.</div>
       ) : (
         <>
+          {payrollOutstanding.length > 0 && (
+            <div className="wl-payroll-note">
+              <span className="wl-payroll-note-icon" aria-hidden="true">!</span>
+              <span>
+                <strong>Heads up:</strong>{' '}
+                {payrollOutstanding.map((r) => r.name).join(', ')}{' '}
+                {payrollOutstanding.length === 1 ? "hasn't" : "haven't"} finished {monthLabel.split(' ')[0]} yet —
+                these invoices may still be missing exams. Check the Payroll page before sending.
+              </span>
+            </div>
+          )}
+
           <p className="wl-summary">
             {ready.length > 0 ? (
               <><strong>{ready.length} {ready.length === 1 ? 'client is' : 'clients are'} ready to invoice.</strong> Open each one, then print or email it.</>
