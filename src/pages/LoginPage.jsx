@@ -27,13 +27,15 @@ export default function LoginPage() {
       if (mode === 'signin') {
         const { error } = await signIn(email, password)
         if (error) throw error
-        navigate('/', { replace: true })
+        // Admins land on the Today hub; examiners are redirected to the
+        // calendar by the /today route guard.
+        navigate('/today', { replace: true })
       } else {
         const { data, error } = await signUp(email, password, name)
         if (error) throw error
         // If email confirmation is on, there's no session yet.
         if (data.session) {
-          navigate('/', { replace: true })
+          navigate('/today', { replace: true })
         } else {
           setNotice('Account created. Check your email to confirm, then sign in.')
           setMode('signin')
@@ -49,7 +51,9 @@ export default function LoginPage() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="auth-mark" aria-hidden="true">SA</div>
+        <div className="auth-mark" aria-hidden="true">
+          <img src="/SAPPS_isotype_white_gold.svg" alt="" style={{ width: '66%', height: '66%' }} />
+        </div>
         <h1>SAPPS Polygraph</h1>
         <p className="lede">
           {mode === 'signin' ? 'Sign in to continue' : 'Create your account'}
