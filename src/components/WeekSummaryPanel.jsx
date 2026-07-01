@@ -6,6 +6,11 @@ import '../styles/week-summary.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const iso = (d) => format(d, 'yyyy-MM-dd')
+const weekStartOf = (dateStr) => iso(startOfWeek(parseISO(dateStr), { weekStartsOn: 1 }))
+const rangeLabel = (startISO) => {
+  const s = parseISO(startISO)
+  return `${format(s, 'MMM d')} – ${format(endOfWeek(s, { weekStartsOn: 1 }), 'MMM d')}`
+}
 
 export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekSubmissions, submitWeek }) {
   const { user, role } = useAuth()
@@ -43,8 +48,41 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
     }
   }, [examinerId, exams, intakeByExam, wStartISO, wEndISO])
 
+  // Status of every week this examiner has exams in — used to point them to a
+  // week that's finished and waiting to be submitted (the panel opens on the
+  // current week, which is often empty).
+  const submittedSet = useMemo(() => {
+    const s = new Set()
+    for (const ws of weekSubmissions) if (ws.examiner_id === examinerId) s.add(ws.week_start)
+    return s
+  }, [weekSubmissions, examinerId])
+
+  const readyWeeks = useMemo(() => {
+    if (!examinerId) return []
+    const m = {}
+    for (const e of exams) {
+      if (e.examiner_id !== examinerId) continue
+      const k = weekStartOf(e.exam_date)
+      const w = (m[k] ||= { total: 0, completed: 0 })
+      w.total += 1
+      if (e.status === 'completed') w.completed += 1
+    }
+    return Object.entries(m)
+      .filter(([k, w]) => w.total > 0 && w.completed === w.total && !submittedSet.has(k))
+      .map(([k]) => k)
+      .sort((a, b) => b.localeCompare(a))
+  }, [exams, examinerId, submittedSet])
+
+  // A finished, unsubmitted week other than the one being viewed.
+  const nudgeWeek = readyWeeks.find((k) => k !== wStartISO) || null
+
   const existing = weekSubmissions.find(
     (s) => s.examiner_id === examinerId && s.week_start === wStartISO
+  )
+
+  const incompleteThisWeek = useMemo(
+    () => (summary ? summary.weekExams.filter((e) => e.status !== 'completed') : []),
+    [summary]
   )
 
   const [showConfirm, setShowConfirm] = useState(false)
@@ -52,11 +90,11 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
   const allDone = summary && summary.total > 0 && summary.completed === summary.total
   const canSubmit = Boolean(examinerId) && allDone && !existing
 
-  let buttonLabel = '✓ Submit Week'
+  let buttonLabel = '✓ Submit this week'
   if (!examinerId) buttonLabel = 'Select an examiner'
   else if (existing) buttonLabel = '✓ Submitted'
   else if (!summary || summary.total === 0) buttonLabel = 'No exams this week'
-  else if (!allDone) buttonLabel = '⊘ Complete exams to submit'
+  else if (!allDone) buttonLabel = `Finish ${incompleteThisWeek.length} to submit`
 
   const examinerLabel = examiners.find((e) => e.id === examinerId)?.name
     || (isExaminer ? 'your' : '—')
@@ -79,12 +117,42 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
         )}
       </div>
 
+      {/* How submitting works */}
+      {examinerId && !existing && (
+        <p className="week-help">
+          Complete each exam on the calendar below (tap it, enter the amounts). When every
+          exam in a week is done, submit it here to send it to payroll.
+        </p>
+      )}
+
+      {/* Point them to a finished week that's waiting to be submitted */}
+      {nudgeWeek && (
+        <div className="week-nudge">
+          <span className="week-nudge-text">
+            <strong>Week of {rangeLabel(nudgeWeek)}</strong> is finished and ready to submit.
+          </span>
+          <button className="week-nudge-btn" onClick={() => setWeekCursor(parseISO(nudgeWeek))}>
+            Go to that week →
+          </button>
+        </div>
+      )}
+
       <div className="week-stats">
         <Stat label="Exams Completed" value={summary ? `${summary.completed} of ${summary.total}` : '—'} />
         <Stat label="Copay Collected" value={`$${money(summary?.copay)}`} />
         <Stat label={isExaminer ? 'Your Commission' : 'Examiner Commission'} value={`$${money(summary?.commission)}`} />
         <Stat label="Office Use" value={`$${money(summary?.office)}`} />
       </div>
+
+      {/* Which exams still need financials this week */}
+      {!existing && incompleteThisWeek.length > 0 && (
+        <div className="week-incomplete">
+          <span className="week-incomplete-label">Still needs amounts before you can submit:</span>
+          <span className="week-incomplete-names">
+            {incompleteThisWeek.map((e) => e.client_name).join(', ')}
+          </span>
+        </div>
+      )}
 
       <div className="week-submit-row">
         {existing ? (
@@ -93,9 +161,13 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
           </span>
         ) : (
           <span className="week-hint">
-            {examinerId
-              ? 'All exams this week need financial details before the week can be submitted.'
-              : 'Choose an examiner to view and submit their week.'}
+            {!examinerId
+              ? 'Choose an examiner to view and submit their week.'
+              : summary && summary.total === 0
+                ? 'No exams assigned to this week. Use ← or the button above to find the right week.'
+                : allDone
+                  ? 'This week is complete — submit it to payroll.'
+                  : 'Finish the exams listed above, then the week can be submitted.'}
           </span>
         )}
         <button
