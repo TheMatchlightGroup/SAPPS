@@ -11,7 +11,10 @@ const greeting = () => {
 export default function HomePage() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { readyToInvoice, invoiced, totalOrgs, weeks, monthName, loading } = useHomeData()
+  const {
+    readyToInvoice, invoiced, totalOrgs, weeks, monthName, loading,
+    payrollOutstanding, payrollHasWork, payrollAllIn,
+  } = useHomeData()
 
   const first = profile?.name ? profile.name.split(' ')[0] : ''
   const today = new Date().toLocaleDateString('en-US', {
@@ -45,14 +48,21 @@ export default function HomePage() {
           <span className="tile-go">Go to Invoicing →</span>
         </button>
 
-        {/* Payroll */}
+        {/* Payroll — is the month in yet? */}
         <button className="home-tile" onClick={() => navigate('/payroll')}>
           <span className="tile-eyebrow">Payroll</span>
           <span className="tile-headline">
-            {loading ? '…' : `${weeks} ${weeks === 1 ? 'week' : 'weeks'} submitted`}
+            {loading ? '…'
+              : payrollOutstanding > 0
+                ? `Waiting on ${payrollOutstanding} ${payrollOutstanding === 1 ? 'examiner' : 'examiners'}`
+                : payrollAllIn ? `Everyone's in for ${monthName}`
+                  : 'No exam data yet'}
           </span>
           <span className="tile-sub">
-            {loading ? '\u00A0' : weeks > 0 ? 'this month — ready to export' : 'submitted weeks show up here'}
+            {loading ? '\u00A0'
+              : payrollOutstanding > 0 ? 'open Payroll to see what\u2019s missing and send reminders'
+                : payrollHasWork ? `${weeks} ${weeks === 1 ? 'week' : 'weeks'} submitted — ready to export`
+                  : 'examiner submissions show up here'}
           </span>
           <span className="tile-go">Go to Payroll →</span>
         </button>
