@@ -23,6 +23,29 @@
 }
 .week-examiner:focus { outline: none; border-color: var(--gold); }
 
+/* How-to helper for examiners */
+.week-help {
+  color: rgba(242,238,228,.62); font-size: 0.9rem; line-height: 1.5;
+  margin: 0 0 var(--s-4); max-width: 70ch;
+}
+
+/* "You have a finished week ready to submit" nudge */
+.week-nudge {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
+  flex-wrap: wrap;
+  background: rgba(196,162,76,.14); border: 1px solid var(--gold);
+  border-radius: var(--radius); padding: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-5);
+}
+.week-nudge-text { color: var(--cream); font-size: 0.95rem; }
+.week-nudge-text strong { color: var(--gold-bright); }
+.week-nudge-btn {
+  background: var(--gold); color: var(--ink-900);
+  font-weight: 600; font-size: 0.9rem; padding: 9px 16px; border-radius: var(--radius);
+  white-space: nowrap; transition: filter .12s ease;
+}
+.week-nudge-btn:hover { filter: brightness(1.06); }
+
 .week-stats {
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: var(--s-3); margin-bottom: var(--s-5);
@@ -38,6 +61,17 @@
   color: var(--gold); font-weight: 700;
 }
 .stat-value { font-family: var(--font-display); font-size: 1.55rem; font-weight: 600; color: var(--cream); }
+
+/* Exams still needing amounts this week */
+.week-incomplete {
+  background: rgba(155,59,46,.14); border: 1px solid rgba(155,59,46,.5);
+  border-radius: var(--radius); padding: var(--s-3) var(--s-4); margin-bottom: var(--s-4);
+}
+.week-incomplete-label {
+  display: block; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;
+  font-weight: 700; color: #E7A79B; margin-bottom: 3px;
+}
+.week-incomplete-names { color: var(--cream); font-size: 0.95rem; font-weight: 500; }
 
 .week-submit-row {
   display: flex; align-items: center; justify-content: space-between;
