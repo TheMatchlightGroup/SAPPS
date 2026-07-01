@@ -1,0 +1,40 @@
+.home { display: flex; flex-direction: column; gap: var(--s-6); max-width: 860px; }
+
+.home-head h2 { font-family: var(--font-display); font-size: 2rem; letter-spacing: -0.01em; }
+.home-date { font-size: 1.1rem; color: var(--ink-700); opacity: 0.75; margin: 6px 0 0; }
+
+.home-tiles { display: grid; gap: var(--s-4); }
+
+.home-tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  text-align: left; width: 100%;
+  background: var(--paper); border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg); padding: var(--s-5) var(--s-6);
+  transition: border-color .12s ease, box-shadow .15s ease, transform .06s ease;
+}
+.home-tile:hover { border-color: var(--gold); box-shadow: 0 4px 16px rgba(6,20,26,.08); }
+.home-tile:active { transform: translateY(1px); }
+.home-tile:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* The lead action gets the ink treatment so it reads first. */
+.home-tile.primary { background: var(--ink-900); border-color: var(--ink-900); }
+.home-tile.primary .tile-eyebrow { color: var(--gold); }
+.home-tile.primary .tile-headline { color: var(--cream); }
+.home-tile.primary .tile-sub { color: rgba(242,238,228,.72); }
+.home-tile.primary .tile-go { color: var(--gold-bright); }
+
+.tile-eyebrow {
+  font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase;
+  font-weight: 700; color: var(--gold-deep);
+}
+.tile-headline {
+  font-family: var(--font-display); font-size: 1.5rem; font-weight: 600;
+  color: var(--ink-900); line-height: 1.15;
+}
+.tile-sub { font-size: 1rem; color: var(--ink-700); opacity: 0.82; }
+.tile-go { margin-top: var(--s-2); font-size: 0.98rem; font-weight: 600; color: var(--gold-deep); }
+
+@media (min-width: 720px) {
+  .home-tiles { grid-template-columns: 1fr 1fr; }
+  .home-tile.primary { grid-column: 1 / -1; }
+}
