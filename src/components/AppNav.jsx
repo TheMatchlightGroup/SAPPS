@@ -5,36 +5,35 @@ export default function AppNav() {
   const { pathname } = useLocation()
   const { profile, role, signOut } = useAuth()
 
-  // Payroll dashboard is admin-only; only show the link to admins.
-  const showPayroll = role === 'payroll_admin'
+  // Today / Payroll / Invoicing are admin-only; examiners just see Calendar.
+  const isAdmin = role === 'payroll_admin'
 
   return (
     <nav className="app-nav">
       <div className="nav-brand">
-        {/* Slot for the SA-monogram-with-scales SVG once provided.
-            Until then, a clean text mark in the brand circle. */}
-        <span className="nav-mark" aria-hidden="true">SA</span>
+        <span className="nav-mark" aria-hidden="true">
+          <img src="/SAPPS_isotype_white_gold.svg" alt="" style={{ width: '70%', height: '70%' }} />
+        </span>
         <h1>SAPPS <span className="sub">Polygraph</span></h1>
       </div>
 
       <div className="nav-right">
         <div className="nav-links">
+          {isAdmin && (
+            <Link to="/today" className={`nav-link ${pathname === '/today' ? 'active' : ''}`}>
+              Today
+            </Link>
+          )}
           <Link to="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`}>
             Calendar
           </Link>
-          {showPayroll && (
-            <Link
-              to="/payroll"
-              className={`nav-link ${pathname === '/payroll' ? 'active' : ''}`}
-            >
+          {isAdmin && (
+            <Link to="/payroll" className={`nav-link ${pathname === '/payroll' ? 'active' : ''}`}>
               Payroll
             </Link>
           )}
-          {showPayroll && (
-            <Link
-              to="/invoicing"
-              className={`nav-link ${pathname === '/invoicing' ? 'active' : ''}`}
-            >
+          {isAdmin && (
+            <Link to="/invoicing" className={`nav-link ${pathname === '/invoicing' ? 'active' : ''}`}>
               Invoicing
             </Link>
           )}
