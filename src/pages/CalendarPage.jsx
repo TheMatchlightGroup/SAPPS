@@ -4,6 +4,7 @@ import {
   format, isSameMonth, isSameDay, addMonths, subMonths, parseISO,
 } from 'date-fns'
 import { useCalendarData } from '../hooks/useCalendarData'
+import { useAuth } from '../context/AuthContext'
 import { TEST_TYPE_ABBR } from '../lib/constants'
 import BookingModal from '../components/BookingModal'
 import CompletionModal from '../components/CompletionModal'
@@ -19,6 +20,12 @@ export default function CalendarPage() {
     createBooking, fetchIntake, completeExam, deleteExam, submitWeek,
   } = useCalendarData()
 
+  const { role } = useAuth()
+  // Only these roles can insert exams (matches the exams_insert RLS policy).
+  // Everyone else (examiners) gets a read-and-complete calendar of their own
+  // exams, so they never hit a booking button that RLS would reject.
+  const canBook = role === 'payroll_admin' || role === 'office'
+
   const [view, setView] = useState('month') // 'month' | 'agenda'
   const [cursor, setCursor] = useState(new Date())
   const [modal, setModal] = useState(null) // { type:'new', date } | { type:'complete', exam }
@@ -29,7 +36,12 @@ export default function CalendarPage() {
     return map
   }, [exams])
 
-  const openNew = (dateISO) => setModal({ type: 'new', date: dateISO || format(new Date(), 'yyyy-MM-dd') })
+  // Gate booking creation at the source: even if a click slips through,
+  // examiners can't open the New Booking modal.
+  const openNew = (dateISO) => {
+    if (!canBook) return
+    setModal({ type: 'new', date: dateISO || format(new Date(), 'yyyy-MM-dd') })
+  }
   const openComplete = (exam) => setModal({ type: 'complete', exam })
   const closeModal = () => setModal(null)
 
@@ -50,7 +62,9 @@ export default function CalendarPage() {
             <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
             <button className={view === 'agenda' ? 'on' : ''} onClick={() => setView('agenda')}>Agenda</button>
           </div>
-          <button className="btn btn-primary" onClick={() => openNew()}>+ New Booking</button>
+          {canBook && (
+            <button className="btn btn-primary" onClick={() => openNew()}>+ New Booking</button>
+          )}
         </div>
       </div>
 
@@ -61,13 +75,18 @@ export default function CalendarPage() {
         <MonthView
           cursor={cursor} setCursor={setCursor}
           examsByDate={examsByDate} examinerName={examinerName}
+          canBook={canBook}
           onDayClick={openNew} onExamClick={openComplete}
         />
       ) : (
-        <AgendaView exams={exams} examinerName={examinerName} onNew={() => openNew()} onExamClick={openComplete} />
+        <AgendaView
+          exams={exams} examinerName={examinerName}
+          canBook={canBook}
+          onNew={() => openNew()} onExamClick={openComplete}
+        />
       )}
 
-      {modal?.type === 'new' && (
+      {modal?.type === 'new' && canBook && (
         <BookingModal
           examiners={examiners}
           defaultDate={modal.date}
@@ -89,7 +108,7 @@ export default function CalendarPage() {
   )
 }
 
-function MonthView({ cursor, setCursor, examsByDate, examinerName, onDayClick, onExamClick }) {
+function MonthView({ cursor, setCursor, examsByDate, examinerName, canBook, onDayClick, onExamClick }) {
   const days = useMemo(() => {
     const gridStart = startOfWeek(startOfMonth(cursor))
     const gridEnd = endOfWeek(endOfMonth(cursor))
@@ -112,8 +131,10 @@ function MonthView({ cursor, setCursor, examsByDate, examinerName, onDayClick, o
           const muted = !isSameMonth(day, cursor)
           const today = isSameDay(day, new Date())
           return (
-            <div key={iso} className={`day-cell${muted ? ' muted' : ''}${today ? ' today' : ''}`}
-              onClick={() => onDayClick(iso)}>
+            <div key={iso}
+              className={`day-cell${muted ? ' muted' : ''}${today ? ' today' : ''}${canBook ? '' : ' readonly'}`}
+              style={canBook ? undefined : { cursor: 'default' }}
+              onClick={canBook ? () => onDayClick(iso) : undefined}>
               <span className="day-num">{format(day, 'd')}</span>
               <div className="day-exams">
                 {dayExams.slice(0, 3).map((ex) => (
@@ -134,11 +155,15 @@ function MonthView({ cursor, setCursor, examsByDate, examinerName, onDayClick, o
   )
 }
 
-function AgendaView({ exams, examinerName, onNew, onExamClick }) {
+function AgendaView({ exams, examinerName, canBook, onNew, onExamClick }) {
   if (exams.length === 0) {
     return (
       <div className="cal-empty">
-        No bookings yet. <button className="link" onClick={onNew}>Create the first one →</button>
+        {canBook ? (
+          <>No bookings yet. <button className="link" onClick={onNew}>Create the first one →</button></>
+        ) : (
+          <>No exams assigned to you yet.</>
+        )}
       </div>
     )
   }
