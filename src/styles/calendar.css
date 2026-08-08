@@ -43,7 +43,8 @@
   background: var(--paper); min-height: 116px; padding: 7px 8px;
   cursor: pointer; transition: background .12s ease; display: flex; flex-direction: column;
 }
-.day-cell:hover { background: #fff; }
+.day-cell:not(.readonly):hover { background: #fff; cursor: pointer; }
+.day-cell.readonly { cursor: default; }
 .day-cell.muted { background: #efeadd; }
 .day-cell.muted .day-num { opacity: 0.4; }
 .day-cell.today .day-num {
