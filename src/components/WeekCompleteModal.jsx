@@ -3,7 +3,7 @@ import '../styles/modal.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function WeekCompleteModal({ summary, onSubmit, onClose }) {
+export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit = false }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -28,7 +28,7 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
-          <h3>Submit Week to Payroll</h3>
+          <h3>{resubmit ? 'Re-submit Week to Payroll' : 'Submit Week to Payroll'}</h3>
           <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         </header>
 
@@ -36,8 +36,9 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose }) {
           {error && <div className="modal-error">{error}</div>}
 
           <p className="week-final-note">
-            You're about to submit <strong>{summary.examiner_name}</strong>'s week of{' '}
-            <strong>{summary.rangeLabel}</strong> to payroll. This action is final.
+            You're about to {resubmit ? 're-submit' : 'submit'} <strong>{summary.examiner_name}</strong>'s week of{' '}
+            <strong>{summary.rangeLabel}</strong> to payroll.{' '}
+            {resubmit ? 'This replaces the totals submitted earlier.' : 'This action is final.'}
           </p>
 
           <div className="week-totals">
@@ -57,7 +58,7 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose }) {
         <footer className="modal-foot">
           <button className="btn btn-text" onClick={onClose} disabled={busy}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={busy}>
-            {busy ? 'Submitting…' : 'Submit Week'}
+            {busy ? 'Submitting…' : resubmit ? 'Re-submit Week' : 'Submit Week'}
           </button>
         </footer>
       </div>

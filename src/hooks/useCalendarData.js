@@ -115,24 +115,25 @@ export function useCalendarData() {
     return { error: null }
   }
 
-  // Insert a week submission. unique(examiner_id, week_start) means a second
-  // submit of the same week is rejected by the DB (23505) — surfaced as a
-  // friendly message; the UI also locks an already-submitted week.
+  // Insert or refresh a week submission. unique(examiner_id, week_start) plus
+  // upsert means the first submit creates the row and any re-submit (after the
+  // week's exams change) updates it in place with fresh totals and timestamp.
   async function submitWeek(payload) {
-    const { error } = await supabase.from('week_submissions').insert({
-      examiner_id: payload.examiner_id,
-      examiner_name: payload.examiner_name,
-      week_start: payload.week_start,
-      week_end: payload.week_end,
-      total_exams: payload.total_exams,
-      completed_exams: payload.completed_exams,
-      total_revenue: payload.total_revenue,
-      submitted_by: user?.email ?? null,
-    })
-    if (error) {
-      if (error.code === '23505') return { error: 'This week has already been submitted.' }
-      return { error: error.message }
-    }
+    const { error } = await supabase.from('week_submissions').upsert(
+      {
+        examiner_id: payload.examiner_id,
+        examiner_name: payload.examiner_name,
+        week_start: payload.week_start,
+        week_end: payload.week_end,
+        total_exams: payload.total_exams,
+        completed_exams: payload.completed_exams,
+        total_revenue: payload.total_revenue,
+        submitted_at: new Date().toISOString(),
+        submitted_by: user?.email ?? null,
+      },
+      { onConflict: 'examiner_id,week_start' }
+    )
+    if (error) return { error: error.message }
     await load()
     return { error: null }
   }

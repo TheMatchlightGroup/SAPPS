@@ -87,11 +87,22 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
 
   const [showConfirm, setShowConfirm] = useState(false)
 
+  // A submitted week goes STALE when its exams change afterward — an exam
+  // added, removed, completed late, or an amount edited. Live math vs stored.
+  const stale = Boolean(
+    existing && summary && (
+      Number(existing.total_exams) !== summary.total ||
+      Number(existing.completed_exams) !== summary.completed ||
+      Math.abs(Number(existing.total_revenue) - summary.revenue) > 0.005
+    )
+  )
+
   const allDone = summary && summary.total > 0 && summary.completed === summary.total
-  const canSubmit = Boolean(examinerId) && allDone && !existing
+  const canSubmit = Boolean(examinerId) && allDone && (!existing || stale)
 
   let buttonLabel = '✓ Submit this week'
   if (!examinerId) buttonLabel = 'Select an examiner'
+  else if (existing && stale) buttonLabel = allDone ? '↻ Re-submit this week' : `Finish ${incompleteThisWeek.length} to re-submit`
   else if (existing) buttonLabel = '✓ Submitted'
   else if (!summary || summary.total === 0) buttonLabel = 'No exams this week'
   else if (!allDone) buttonLabel = `Finish ${incompleteThisWeek.length} to submit`
@@ -145,7 +156,7 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
       </div>
 
       {/* Which exams still need financials this week */}
-      {!existing && incompleteThisWeek.length > 0 && (
+      {(!existing || stale) && incompleteThisWeek.length > 0 && (
         <div className="week-incomplete">
           <span className="week-incomplete-label">Still needs amounts before you can submit:</span>
           <span className="week-incomplete-names">
@@ -155,9 +166,15 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
       )}
 
       <div className="week-submit-row">
-        {existing ? (
+        {existing && !stale ? (
           <span className="week-hint done">
             Submitted {format(parseISO(existing.submitted_at), 'MMM d, h:mm a')} · ${money(existing.total_revenue)} total
+          </span>
+        ) : existing && stale ? (
+          <span className="week-hint">
+            {allDone
+              ? `This week changed after it was submitted (${format(parseISO(existing.submitted_at), 'MMM d, h:mm a')}) — re-submit to update payroll.`
+              : 'This week changed after it was submitted. Finish the exams above, then re-submit to update payroll.'}
           </span>
         ) : (
           <span className="week-hint">
@@ -196,6 +213,7 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
             total_revenue: summary.revenue,
           }}
           onSubmit={submitWeek}
+          resubmit={stale}
           onClose={() => setShowConfirm(false)}
         />
       )}
