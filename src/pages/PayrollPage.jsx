@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { usePayrollData } from '../hooks/usePayrollData'
-import { buildReminderMailto, weekRangeLabel, monthLabelOf } from '../lib/monthClose'
+import { buildReminderEmail, weekRangeLabel, monthLabelOf } from '../lib/monthClose'
+import { gmailComposeUrl, mailtoUrl, copyEmailToClipboard } from '../lib/emailLinks'
 import '../styles/payroll.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -160,12 +161,48 @@ function ExaminerCard({ row, month, monthName }) {
       )}
 
       {row.email ? (
-        <a className="pr-remind" href={buildReminderMailto(row, month)}>
-          ✉ Email {row.name.split(' ')[0]} a reminder
-        </a>
+        <ReminderButtons row={row} month={month} />
       ) : (
         <span className="pr-remind-none">No email on file for {row.name}.</span>
       )}
+    </div>
+  )
+}
+
+// One tap opens the reminder wherever the admin actually emails from.
+function ReminderButtons({ row, month }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const email = buildReminderEmail(row, month)
+  const first = row.name.split(' ')[0]
+
+  async function copy() {
+    try {
+      await copyEmailToClipboard(email)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch (_) { /* clipboard blocked; the other two options remain */ }
+  }
+
+  if (!open) {
+    return (
+      <button className="pr-remind" onClick={() => setOpen(true)}>
+        ✉ Email {first} a reminder
+      </button>
+    )
+  }
+  return (
+    <div className="pr-remind-choices">
+      <a className="pr-remind-choice" href={gmailComposeUrl(email)} target="_blank" rel="noreferrer">
+        Open in Gmail
+      </a>
+      <a className="pr-remind-choice" href={mailtoUrl(email)}>
+        Open in Mail app
+      </a>
+      <button className="pr-remind-choice" onClick={copy}>
+        {copied ? '✓ Copied' : 'Copy message'}
+      </button>
+      <button className="pr-remind-cancel" onClick={() => setOpen(false)} aria-label="Close">×</button>
     </div>
   )
 }

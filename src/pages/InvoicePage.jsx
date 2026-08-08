@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useInvoiceData } from '../hooks/useInvoiceData'
 import { COMPANY, orgCode, orgBillTo, orgEmails } from '../lib/constants'
+import { gmailComposeUrl, mailtoUrl, copyEmailToClipboard } from '../lib/emailLinks'
 import '../styles/invoice.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -198,17 +199,35 @@ function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent,
     if (error) setErr(error)
   }
 
-  function openEmail() {
-    const subject = `SAPPS Invoice ${invoiceNumber} — ${org}, ${monthLabel}`
-    const body =
+  const [copied, setCopied] = useState(false)
+
+  const emailParts = () => ({
+    to: emails.join(','),
+    subject: `SAPPS Invoice ${invoiceNumber} — ${org}, ${monthLabel}`,
+    body:
       `Please find attached SAPPS invoice ${invoiceNumber} for ${org}, ${monthLabel}.\n\n` +
       `Total amount due: $${money(totals.due)}\n\n` +
-      `Thank you,\n${COMPANY.name}`
+      `Thank you,\n${COMPANY.name}`,
+  })
+
+  // Open the pre-written email wherever the admin actually works, then record it.
+  function openVia(kind) {
+    const parts = emailParts()
     try {
-      window.location.href = `mailto:${emails.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    } catch (_) { /* sandbox may block mailto; the mark still records it */ }
+      if (kind === 'gmail') window.open(gmailComposeUrl(parts), '_blank', 'noopener')
+      else window.location.href = mailtoUrl(parts)
+    } catch (_) { /* sandbox may block; the mark still records it */ }
     mark('email')
     setEmailPanel(false)
+  }
+
+  // Copy for pasting into any client. Doesn't auto-mark — nothing was sent yet.
+  async function copyMessage() {
+    try {
+      await copyEmailToClipboard(emailParts())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
+    } catch (_) { /* clipboard blocked; other options remain */ }
   }
 
   return (
@@ -323,10 +342,21 @@ function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent,
           )}
           <div className="email-panel-actions">
             <button className="btn-xl ghost" onClick={() => setEmailPanel(false)}>Back</button>
-            <button className="btn-xl email" onClick={openEmail} disabled={busy || emails.length === 0}>
-              Open email &amp; mark sent
+            <button className="btn-xl email" onClick={() => openVia('gmail')} disabled={busy || emails.length === 0}>
+              Open in Gmail
+            </button>
+            <button className="btn-xl email alt" onClick={() => openVia('mailto')} disabled={busy || emails.length === 0}>
+              Open in Mail app
+            </button>
+            <button className="btn-xl ghost" onClick={copyMessage} disabled={emails.length === 0}>
+              {copied ? '✓ Copied' : 'Copy message'}
             </button>
           </div>
+          {copied && (
+            <div className="email-panel-hint">
+              Copied — paste it into your email client, attach the PDF, then tap “Mark this invoice as sent.”
+            </div>
+          )}
         </div>
       ) : (
         <>

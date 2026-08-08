@@ -254,3 +254,8 @@
   .wl-row { padding: var(--s-4); }
   .wl-row-name { font-size: 1.2rem; }
 }
+
+/* Email chooser variants */
+.email-panel-actions { flex-wrap: wrap; }
+.btn-xl.email.alt { background: transparent; color: var(--ink-900); border: 2px solid var(--ink-900); }
+.btn-xl.email.alt:hover:not(:disabled) { background: var(--paper); filter: none; }

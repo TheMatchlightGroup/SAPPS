@@ -108,12 +108,12 @@ export function computeMonthClose({ exams, submissions, examiners, month, todayI
 }
 
 /**
- * Pre-written reminder email for one examiner — opens in the
- * payroll user's own mail app via mailto. Plain, friendly,
- * and lists exactly what's missing so the examiner doesn't
- * have to hunt.
+ * Pre-written reminder email for one examiner — plain, friendly, and lists
+ * exactly what's missing so the examiner doesn't have to hunt. Returns the
+ * parts ({to, subject, body}) so the caller can open it in Gmail, the mail
+ * app, or copy it — whatever the payroll admin actually uses.
  */
-export function buildReminderMailto(row, monthYM) {
+export function buildReminderEmail(row, monthYM) {
   const monthLabel = monthLabelOf(monthYM)
   const first = (row.name || '').split(' ')[0] || 'there'
 
@@ -139,5 +139,5 @@ export function buildReminderMailto(row, monthYM) {
 
   const subject = `SAPPS payroll — ${monthLabel} items outstanding`
   const body = parts.join('\n')
-  return `mailto:${row.email || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  return { to: row.email || '', subject, body }
 }

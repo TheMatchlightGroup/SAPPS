@@ -132,3 +132,21 @@
   .pr-banner-go { width: 100%; }
   .payroll-table th, .payroll-table td { padding: 10px 12px; font-size: 0.84rem; }
 }
+
+/* Reminder chooser: Gmail / Mail app / Copy */
+.pr-remind-choices { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pr-remind-choice {
+  font-size: 0.88rem; font-weight: 600; text-decoration: none; cursor: pointer;
+  padding: 9px 14px; border-radius: 8px; border: 1.5px solid var(--ink-900);
+  background: var(--ink-900); color: var(--cream); transition: filter 0.15s;
+}
+.pr-remind-choice:hover { filter: brightness(1.15); }
+.pr-remind-choice:nth-child(2), button.pr-remind-choice {
+  background: transparent; color: var(--ink-900);
+}
+.pr-remind-cancel {
+  background: none; border: none; cursor: pointer; font-size: 1.2rem;
+  color: var(--ink-500, #6b7a80); padding: 4px 8px; line-height: 1;
+}
+button.pr-remind { border: none; cursor: pointer; font-family: inherit; width: 100%; }
+button.pr-remind-choice, .pr-remind-cancel { font-family: inherit; }
