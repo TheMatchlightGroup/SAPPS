@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { computeMonthClose } from '../lib/monthClose'
 
-const thisMonth = () => new Date().toISOString().slice(0, 7)
+const thisMonth = () => {
+  const d = new Date() // local month, not UTC
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']
 

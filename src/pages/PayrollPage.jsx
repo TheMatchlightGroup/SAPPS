@@ -6,7 +6,10 @@ import { buildReminderMailto, weekRangeLabel, monthLabelOf } from '../lib/monthC
 import '../styles/payroll.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const thisMonth = () => new Date().toISOString().slice(0, 7)
+const thisMonth = () => {
+  const d = new Date() // local month, not UTC
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 function shiftMonth(ym, delta) {
   const [y, m] = ym.split('-').map(Number)

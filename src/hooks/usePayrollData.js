@@ -20,7 +20,10 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url)
 }
 const money = (n) => (Number(n) || 0).toFixed(2)
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => {
+  const d = new Date() // local date, not UTC
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 // Month-centric payroll data. `month` is 'YYYY-MM'; everything the page
 // shows — examiner status, submissions, exports — is scoped to it.

@@ -6,7 +6,10 @@ import '../styles/invoice.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-const thisMonth = () => new Date().toISOString().slice(0, 7)
+const thisMonth = () => {
+  const d = new Date() // local month, not UTC
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 // Shift a 'YYYY-MM' string by whole months.
 function shiftMonth(ym, delta) {

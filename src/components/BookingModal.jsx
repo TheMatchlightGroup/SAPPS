@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { ORGANIZATIONS, TEST_TYPES } from '../lib/constants'
 import '../styles/modal.css'
 
-const todayISO = () => new Date().toISOString().slice(0, 10)
+const todayISO = () => {
+  const d = new Date() // local date, not UTC — Virginia evenings are still today
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export default function BookingModal({ examiners, defaultDate, lockedExaminer, onClose, onCreate }) {
   const [form, setForm] = useState({
