@@ -52,7 +52,7 @@ export default function LoginPage() {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-mark" aria-hidden="true">
-          <img src="/SAPPS_isotype_white_gold.svg" alt="" style={{ width: '66%', height: '66%' }} />
+          <img src="/SAPPS_isotype_white_gold.png" alt="" style={{ width: '66%', height: '66%' }} />
         </div>
         <h1>SAPPS Polygraph</h1>
         <p className="lede">

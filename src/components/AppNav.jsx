@@ -12,7 +12,7 @@ export default function AppNav() {
     <nav className="app-nav">
       <div className="nav-brand">
         <span className="nav-mark" aria-hidden="true">
-          <img src="/SAPPS_isotype_white_gold.svg" alt="" style={{ width: '70%', height: '70%' }} />
+          <img src="/SAPPS_isotype_white_gold.png" alt="" style={{ width: '70%', height: '70%' }} />
         </span>
         <h1>SAPPS <span className="sub">Polygraph</span></h1>
       </div>
