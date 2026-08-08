@@ -20,11 +20,13 @@ export default function CalendarPage() {
     createBooking, fetchIntake, completeExam, deleteExam, submitWeek,
   } = useCalendarData()
 
-  const { role } = useAuth()
-  // Only these roles can insert exams (matches the exams_insert RLS policy).
-  // Everyone else (examiners) gets a read-and-complete calendar of their own
-  // exams, so they never hit a booking button that RLS would reject.
-  const canBook = role === 'payroll_admin' || role === 'office'
+  const { role, profile } = useAuth()
+  // Office roles can book for anyone; examiners can book for themselves.
+  // Matches the exams_insert RLS policy (admin/office, or examiner_id = self).
+  const isOffice = role === 'payroll_admin' || role === 'office'
+  const canBook = isOffice || role === 'examiner'
+  // When an examiner books, the exam is locked to them — no picking colleagues.
+  const lockedExaminer = isOffice ? null : profile
 
   const [view, setView] = useState('month') // 'month' | 'agenda'
   const [cursor, setCursor] = useState(new Date())
@@ -90,6 +92,7 @@ export default function CalendarPage() {
         <BookingModal
           examiners={examiners}
           defaultDate={modal.date}
+          lockedExaminer={lockedExaminer}
           onClose={closeModal}
           onCreate={createBooking}
         />

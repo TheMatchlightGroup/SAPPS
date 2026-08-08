@@ -4,13 +4,13 @@ import '../styles/modal.css'
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
-export default function BookingModal({ examiners, defaultDate, onClose, onCreate }) {
+export default function BookingModal({ examiners, defaultDate, lockedExaminer, onClose, onCreate }) {
   const [form, setForm] = useState({
     client_name: '',
     exam_date: defaultDate || todayISO(),
     exam_time: '10:00',
     organization: '',
-    examiner_id: '',
+    examiner_id: lockedExaminer?.id || '',
     exam_type: 'Maintenance',
     duration_minutes: 60,
   })
@@ -72,14 +72,20 @@ export default function BookingModal({ examiners, defaultDate, onClose, onCreate
 
           <div className="field">
             <label>Assigned examiner</label>
-            <select value={form.examiner_id} onChange={set('examiner_id')}>
-              <option value="">Unassigned</option>
-              {examiners.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
-            {examiners.length === 0 && (
-              <span className="field-hint">
-                No examiners yet — create examiner accounts and they'll appear here.
-              </span>
+            {lockedExaminer ? (
+              <input type="text" value={lockedExaminer.name} disabled />
+            ) : (
+              <>
+                <select value={form.examiner_id} onChange={set('examiner_id')}>
+                  <option value="">Unassigned</option>
+                  {examiners.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+                {examiners.length === 0 && (
+                  <span className="field-hint">
+                    No examiners yet — create examiner accounts and they'll appear here.
+                  </span>
+                )}
+              </>
             )}
           </div>
 
