@@ -15,6 +15,7 @@ export const EXAMINERS = [
   { name: 'Nate Perkins', email: 'nate.perkins@polyassessment.com' },
   { name: 'Brad Hughes', email: 'bdhhwt@gmail.com' },
   { name: 'Kat Manning', email: 'polygraphprofessionalservices@gmail.com' },
+  { name: 'Myron "Al" Moore', email: 'amoorepoly@yahoo.com' }, // displays as "Al Moore" in-app
 ]
 
 // ---- Booking org dropdown (grouped) ----
