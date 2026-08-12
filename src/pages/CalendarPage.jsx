@@ -17,20 +17,19 @@ export default function CalendarPage() {
   const {
     exams, examiners, examinerName, intakeByExam, weekSubmissions,
     loading, error,
-    createBooking, fetchIntake, completeExam, deleteExam, submitWeek,
+    createBooking, updateBooking, fetchIntake, completeExam, deleteExam, submitWeek,
   } = useCalendarData()
 
-  const { role, profile } = useAuth()
-  // Office roles can book for anyone; examiners can book for themselves.
-  // Matches the exams_insert RLS policy (admin/office, or examiner_id = self).
+  const { role } = useAuth()
+  // Scheduling is office-only now (decided on the 8/8 review call): Cris/Ren
+  // book and edit; examiners are read-only on the calendar and only interact
+  // with their own exams via the completion modal.
   const isOffice = role === 'payroll_admin' || role === 'office'
-  const canBook = isOffice || role === 'examiner'
-  // When an examiner books, the exam is locked to them — no picking colleagues.
-  const lockedExaminer = isOffice ? null : profile
+  const canBook = isOffice
 
   const [view, setView] = useState('month') // 'month' | 'agenda'
   const [cursor, setCursor] = useState(new Date())
-  const [modal, setModal] = useState(null) // { type:'new', date } | { type:'complete', exam }
+  const [modal, setModal] = useState(null) // { type:'new', date } | { type:'complete', exam } | { type:'edit', exam }
 
   const examsByDate = useMemo(() => {
     const map = {}
@@ -92,9 +91,16 @@ export default function CalendarPage() {
         <BookingModal
           examiners={examiners}
           defaultDate={modal.date}
-          lockedExaminer={lockedExaminer}
           onClose={closeModal}
-          onCreate={createBooking}
+          onSave={createBooking}
+        />
+      )}
+      {modal?.type === 'edit' && isOffice && (
+        <BookingModal
+          examiners={examiners}
+          exam={modal.exam}
+          onClose={closeModal}
+          onSave={(form) => updateBooking(modal.exam.id, form)}
         />
       )}
       {modal?.type === 'complete' && (
@@ -105,6 +111,9 @@ export default function CalendarPage() {
           onComplete={completeExam}
           onDelete={deleteExam}
           onClose={closeModal}
+          canDelete={isOffice}
+          canEditBooking={isOffice}
+          onEditBooking={(exam) => setModal({ type: 'edit', exam })}
         />
       )}
     </div>
@@ -143,7 +152,7 @@ function MonthView({ cursor, setCursor, examsByDate, examinerName, canBook, onDa
                 {dayExams.slice(0, 3).map((ex) => (
                   <div key={ex.id} className={`chip${ex.status === 'completed' ? ' done' : ''}`}
                     onClick={(e) => { e.stopPropagation(); onExamClick(ex) }}
-                    title={`${ex.client_name} • ${ex.exam_type} • ${examinerName(ex.examiner_id)}`}>
+                    title={`${ex.client_name} • ${ex.exam_type || 'Type TBD'} • ${examinerName(ex.examiner_id)}`}>
                     <span className="chip-time">{ex.exam_time?.slice(0, 5)}</span>
                     {ex.client_name}
                   </div>
@@ -181,7 +190,7 @@ function AgendaView({ exams, examinerName, canBook, onNew, onExamClick }) {
           <div className="agenda-main">
             <span className="agenda-name">{ex.client_name}</span>
             <span className="agenda-meta">
-              {ex.organization} · {TEST_TYPE_ABBR[ex.exam_type] || ex.exam_type} · {ex.duration_minutes}min
+              {ex.organization} · {TEST_TYPE_ABBR[ex.exam_type] || ex.exam_type || 'TBD'} · {ex.duration_minutes}min
             </span>
           </div>
           <div className="agenda-side">

@@ -214,6 +214,14 @@
 .inv-edit:hover { border-color: var(--line-strong); }
 .inv-edit:focus { outline: none; border-color: var(--gold-deep); background: #fff; }
 
+/* PO number row in the meta block — editable only in "Fix a number" mode */
+.inv-po-edit { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.inv-po-edit .inv-edit {
+  width: 120px; text-align: right;
+  border-color: var(--line-strong); background: var(--paper);
+  font-variant-numeric: normal;
+}
+
 .inv-table tfoot td {
   border-top: 2px solid var(--ink-900); border-bottom: none;
   padding-top: 12px; font-family: var(--font-display); font-weight: 700; font-size: 1rem;

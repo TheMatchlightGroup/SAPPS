@@ -24,7 +24,7 @@ export function useHomeData() {
       supabase.from('exams').select('id, client_name, organization, exam_date, status, examiner_id'),
       supabase.from('invoices').select('organization, month'),
       supabase.from('week_submissions').select('id, examiner_id, week_start, week_end'),
-      supabase.from('users').select('id, name, email, role, active'),
+      supabase.from('users').select('id, name, email, role, active, is_examiner'),
     ])
 
     const exams = examRes.data || []
@@ -36,7 +36,7 @@ export function useHomeData() {
     const invoiced = orgs.filter((o) => sent.has(o)).length
     const weeks = (weekRes.data || []).filter((w) => (w.week_start || '').startsWith(month)).length
 
-    const examiners = (userRes.data || []).filter((u) => u.role === 'examiner' && u.active)
+    const examiners = (userRes.data || []).filter((u) => u.is_examiner && u.active)
     const close = computeMonthClose({
       exams,
       submissions: weekRes.data || [],

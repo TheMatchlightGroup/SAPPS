@@ -22,10 +22,12 @@ export function useCalendarData() {
         .select('id, client_name, exam_date, exam_time, exam_type, organization, duration_minutes, status, examiner_id')
         .order('exam_date', { ascending: true })
         .order('exam_time', { ascending: true }),
+      // is_examiner (not role) decides who appears in examiner lists —
+      // Cris is payroll_admin AND runs her own exams.
       supabase
         .from('users')
         .select('id, name')
-        .eq('role', 'examiner')
+        .eq('is_examiner', true)
         .eq('active', true)
         .order('name', { ascending: true }),
       supabase
@@ -60,12 +62,31 @@ export function useCalendarData() {
       client_name: form.client_name.trim(),
       exam_date: form.exam_date,
       exam_time: form.exam_time,
-      exam_type: form.exam_type,
+      exam_type: null, // chosen by the examiner at completion, not at booking
       organization: form.organization,
       duration_minutes: Number(form.duration_minutes) || 60,
       examiner_id: form.examiner_id || null,
       created_by: user?.id ?? null,
     })
+    if (error) return { error: error.message }
+    await load()
+    return { error: null }
+  }
+
+  // Office-side booking edits (reshuffles, swaps, name fixes). Never touches
+  // exam_type or status — those belong to the completion flow.
+  async function updateBooking(examId, form) {
+    const { error } = await supabase
+      .from('exams')
+      .update({
+        client_name: form.client_name.trim(),
+        exam_date: form.exam_date,
+        exam_time: form.exam_time,
+        organization: form.organization,
+        duration_minutes: Number(form.duration_minutes) || 60,
+        examiner_id: form.examiner_id || null,
+      })
+      .eq('id', examId)
     if (error) return { error: error.message }
     await load()
     return { error: null }
@@ -100,7 +121,7 @@ export function useCalendarData() {
 
     const { error: examErr } = await supabase
       .from('exams')
-      .update({ status: 'completed' })
+      .update({ status: 'completed', exam_type: financials.exam_type || exam.exam_type || null })
       .eq('id', exam.id)
     if (examErr) return { error: examErr.message }
 
@@ -141,6 +162,6 @@ export function useCalendarData() {
   return {
     exams, examiners, examinerName, intakeByExam, weekSubmissions,
     loading, error, refetch: load,
-    createBooking, fetchIntake, completeExam, deleteExam, submitWeek,
+    createBooking, updateBooking, fetchIntake, completeExam, deleteExam, submitWeek,
   }
 }

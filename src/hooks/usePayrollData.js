@@ -52,7 +52,7 @@ export function usePayrollData(month) {
         .select('exam_id, copay_amount, amount_due_examiner, amount_due_sapps, submitted_at'),
       supabase
         .from('users')
-        .select('id, name, email, role, active'),
+        .select('id, name, email, role, active, is_examiner'),
     ])
     if (subRes.error) setError(subRes.error.message)
 
@@ -65,7 +65,7 @@ export function usePayrollData(month) {
     setExams(examRes.data || [])
     setIntakeByExam(intakeMap)
     setUserName(nameMap)
-    setExaminers((userRes.data || []).filter((u) => u.role === 'examiner' && u.active))
+    setExaminers((userRes.data || []).filter((u) => u.is_examiner && u.active))
     setLoading(false)
   }, [])
 

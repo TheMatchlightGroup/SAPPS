@@ -20,7 +20,7 @@ function shiftMonth(ym, delta) {
 }
 
 export default function InvoicePage() {
-  const { exams, intakeByExam, loading, sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor } = useInvoiceData()
+  const { exams, intakeByExam, loading, sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor, poFor, savePo } = useInvoiceData()
   const [month, setMonth] = useState(thisMonth())
   const [selectedOrg, setSelectedOrg] = useState(null)
 
@@ -68,6 +68,8 @@ export default function InvoicePage() {
         amountOf={amountOf}
         copayOf={copayOf}
         sent={sentStatus(selectedOrg, month)}
+        savedPo={poFor(selectedOrg)}
+        onSavePo={savePo}
         onMarkSent={markInvoiceSent}
         onUnmark={unmarkInvoiceSent}
         onBack={() => setSelectedOrg(null)}
@@ -158,11 +160,29 @@ function ClientRow({ ent, onOpen }) {
   )
 }
 
-function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent, onMarkSent, onUnmark, onBack }) {
+function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent, savedPo, onSavePo, onMarkSent, onUnmark, onBack }) {
   const [editing, setEditing] = useState(false)
   const [emailPanel, setEmailPanel] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+
+  // PO number — some clients (VCBR, PWAD, SOPMU) now require one on the
+  // invoice. Saved per organization: type it once in "Fix a number" mode and
+  // it stays on every invoice for that client. Blank = the line doesn't print.
+  const [po, setPo] = useState(savedPo || '')
+  useEffect(() => { setPo(savedPo || '') }, [savedPo, org])
+
+  async function persistPo() {
+    if ((po || '').trim() === (savedPo || '').trim()) return
+    const { error } = await onSavePo(org, po)
+    if (error) setErr(error)
+  }
+
+  // "Done fixing" also commits the PO — one tap ends the whole edit.
+  function toggleEditing() {
+    if (editing) persistPo()
+    setEditing((v) => !v)
+  }
 
   const base = useMemo(
     () => exams.map((e) => ({ id: e.id, date: e.exam_date, type: e.exam_type, name: e.client_name, amount: amountOf(e), copay: copayOf(e) })),
@@ -242,7 +262,7 @@ function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent,
 
       {/* Fix-a-number escape hatch (screen only) */}
       <div className="iv-fixrow">
-        <button className={`btn-fix${editing ? ' on' : ''}`} onClick={() => setEditing((v) => !v)}>
+        <button className={`btn-fix${editing ? ' on' : ''}`} onClick={toggleEditing}>
           {editing ? '✓ Done fixing' : '✎ Fix a number'}
         </button>
       </div>
@@ -269,6 +289,21 @@ function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent,
             <div><span>Invoice #</span><strong>{invoiceNumber}</strong></div>
             <div><span>Month of Services</span><strong>{MONTHS[Number(m)]}</strong></div>
             <div><span>Date of Invoice</span><strong>{format(new Date(), 'M/d/yy')}</strong></div>
+            {editing ? (
+              <div className="inv-po-edit">
+                <span>PO Number</span>
+                <input
+                  className="inv-edit"
+                  type="text"
+                  placeholder="none"
+                  value={po}
+                  onChange={(e) => setPo(e.target.value)}
+                  onBlur={persistPo}
+                />
+              </div>
+            ) : po.trim() ? (
+              <div><span>PO Number</span><strong>{po.trim()}</strong></div>
+            ) : null}
           </div>
         </div>
 

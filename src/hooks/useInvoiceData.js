@@ -14,6 +14,7 @@ export function useInvoiceData() {
   const [exams, setExams] = useState([])             // completed only — invoice lines
   const [intakeByExam, setIntakeByExam] = useState({})
   const [sentByKey, setSentByKey] = useState({})     // `${organization}__${month}` -> invoice row
+  const [poByOrg, setPoByOrg] = useState({})         // organization -> saved PO number
   const [submissions, setSubmissions] = useState([])
   const [examiners, setExaminers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -22,7 +23,7 @@ export function useInvoiceData() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [examRes, intakeRes, invRes, weekRes, userRes] = await Promise.all([
+    const [examRes, intakeRes, invRes, weekRes, userRes, poRes] = await Promise.all([
       supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_type, organization, status, examiner_id')
@@ -38,7 +39,10 @@ export function useInvoiceData() {
         .select('examiner_id, week_start, week_end'),
       supabase
         .from('users')
-        .select('id, name, email, role, active'),
+        .select('id, name, email, role, active, is_examiner'),
+      supabase
+        .from('org_pos')
+        .select('organization, po_number'),
     ])
     if (examRes.error) setError(examRes.error.message)
 
@@ -48,13 +52,17 @@ export function useInvoiceData() {
     const sent = {}
     for (const r of invRes.data || []) sent[`${r.organization}__${r.month}`] = r
 
+    const pos = {}
+    for (const r of poRes.data || []) pos[r.organization] = r.po_number
+
     const all = examRes.data || []
     setAllExams(all)
     setExams(all.filter((e) => e.status === 'completed'))
     setIntakeByExam(map)
     setSentByKey(sent)
+    setPoByOrg(pos)
     setSubmissions(weekRes.data || [])
-    setExaminers((userRes.data || []).filter((u) => u.role === 'examiner' && u.active))
+    setExaminers((userRes.data || []).filter((u) => u.is_examiner && u.active))
     setLoading(false)
   }, [])
 
@@ -96,6 +104,39 @@ export function useInvoiceData() {
     return { error: null }
   }
 
+  // Saved PO number for an org ('' if none). POs persist per organization —
+  // enter it once, it appears on every invoice for that client until changed.
+  const poFor = useCallback((organization) => poByOrg[organization] || '', [poByOrg])
+
+  // Save (or clear, when blank) the org's PO number. Blank deletes the row so
+  // the PO line disappears from the printed invoice entirely.
+  async function savePo(organization, poNumber) {
+    const trimmed = (poNumber || '').trim()
+    if (!trimmed) {
+      const { error } = await supabase.from('org_pos').delete().eq('organization', organization)
+      if (error) return { error: error.message }
+    } else {
+      const { data: u } = await supabase.auth.getUser()
+      const { error } = await supabase.from('org_pos').upsert(
+        {
+          organization,
+          po_number: trimmed,
+          updated_at: new Date().toISOString(),
+          updated_by: u?.user?.email ?? null,
+        },
+        { onConflict: 'organization' }
+      )
+      if (error) return { error: error.message }
+    }
+    setPoByOrg((m) => {
+      const next = { ...m }
+      if (trimmed) next[organization] = trimmed
+      else delete next[organization]
+      return next
+    })
+    return { error: null }
+  }
+
   // Undo a "sent" mark (mistakes happen).
   async function unmarkInvoiceSent({ organization, month }) {
     const { error } = await supabase
@@ -111,5 +152,6 @@ export function useInvoiceData() {
   return {
     exams, intakeByExam, billableOrgs, loading, error, refetch: load,
     sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor,
+    poFor, savePo,
   }
 }
