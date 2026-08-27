@@ -9,6 +9,7 @@ export function useCalendarData() {
   const [exams, setExams] = useState([])
   const [examiners, setExaminers] = useState([])
   const [intakeByExam, setIntakeByExam] = useState({})
+  const [reportByExam, setReportByExam] = useState({})
   const [weekSubmissions, setWeekSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -16,7 +17,7 @@ export function useCalendarData() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [examRes, examinerRes, intakeRes, weekRes] = await Promise.all([
+    const [examRes, examinerRes, intakeRes, weekRes, reportRes] = await Promise.all([
       supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_time, exam_type, organization, duration_minutes, status, examiner_id')
@@ -37,15 +38,22 @@ export function useCalendarData() {
         .from('week_submissions')
         .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, submitted_at')
         .order('week_start', { ascending: false }),
+      supabase
+        .from('reports')
+        .select('id, exam_id, status'),
     ])
     if (examRes.error) setError(examRes.error.message)
 
     const intakeMap = {}
     for (const row of intakeRes.data || []) intakeMap[row.exam_id] = row
 
+    const reportMap = {}
+    for (const row of reportRes.data || []) if (row.exam_id) reportMap[row.exam_id] = row
+
     setExams(examRes.data || [])
     setExaminers(examinerRes.data || [])
     setIntakeByExam(intakeMap)
+    setReportByExam(reportMap)
     setWeekSubmissions(weekRes.data || [])
     setLoading(false)
   }, [])
@@ -159,9 +167,44 @@ export function useCalendarData() {
     return { error: null }
   }
 
+  // "No report needed" — polygraph terminated (sick examinee, no payment,
+  // PO pulled the plug). Creates/updates the report row as waived so the
+  // week-submit gate and the library both know. Unwaiving deletes the
+  // placeholder row (a waived row holds no written content).
+  async function waiveReport(exam, reason) {
+    const { error } = await supabase.from('reports').upsert(
+      {
+        exam_id: exam.id,
+        examiner_id: exam.examiner_id ?? null,
+        client_name: exam.client_name,
+        organization: exam.organization,
+        exam_date: exam.exam_date,
+        exam_type: exam.exam_type ?? null,
+        status: 'waived',
+        waive_reason: reason || 'Polygraph terminated — no report required',
+        updated_at: new Date().toISOString(),
+        updated_by: user?.email ?? null,
+      },
+      { onConflict: 'exam_id' }
+    )
+    if (error) return { error: error.message }
+    await load()
+    return { error: null }
+  }
+
+  async function unwaiveReport(exam) {
+    const existing = reportByExam[exam.id]
+    if (!existing) return { error: null }
+    const { error } = await supabase.from('reports').delete().eq('id', existing.id).eq('status', 'waived')
+    if (error) return { error: error.message }
+    await load()
+    return { error: null }
+  }
+
   return {
-    exams, examiners, examinerName, intakeByExam, weekSubmissions,
+    exams, examiners, examinerName, intakeByExam, reportByExam, weekSubmissions,
     loading, error, refetch: load,
     createBooking, updateBooking, fetchIntake, completeExam, deleteExam, submitWeek,
+    waiveReport, unwaiveReport,
   }
 }

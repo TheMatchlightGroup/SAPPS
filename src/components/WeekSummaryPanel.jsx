@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { startOfWeek, endOfWeek, addWeeks, subWeeks, format, parseISO } from 'date-fns'
 import { useAuth } from '../context/AuthContext'
+import { reportOverdue, reportSatisfied, REPORT_GRACE_BUSINESS_DAYS } from '../lib/reportUtils'
 import WeekCompleteModal from './WeekCompleteModal'
 import '../styles/week-summary.css'
 
@@ -12,7 +13,7 @@ const rangeLabel = (startISO) => {
   return `${format(s, 'MMM d')} – ${format(endOfWeek(s, { weekStartsOn: 1 }), 'MMM d')}`
 }
 
-export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekSubmissions, submitWeek }) {
+export default function WeekSummaryPanel({ exams, examiners, intakeByExam, reportByExam = {}, weekSubmissions, submitWeek }) {
   const { user, role } = useAuth()
   const isExaminer = role === 'examiner'
 
@@ -85,6 +86,24 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
     [summary]
   )
 
+  // Report gate: every completed exam needs a final (or waived) report before
+  // the week goes to payroll — but agencies allow 5 business days, so recent
+  // exams get a grace window (reminder, not a block).
+  const reportsMissing = useMemo(
+    () => (summary
+      ? summary.weekExams.filter((e) => e.status === 'completed' && !reportSatisfied(reportByExam[e.id]))
+      : []),
+    [summary, reportByExam]
+  )
+  const reportsBlocking = useMemo(
+    () => reportsMissing.filter((e) => reportOverdue(e.exam_date)),
+    [reportsMissing]
+  )
+  const reportsInGrace = useMemo(
+    () => reportsMissing.filter((e) => !reportOverdue(e.exam_date)),
+    [reportsMissing]
+  )
+
   const [showConfirm, setShowConfirm] = useState(false)
 
   // A submitted week goes STALE when its exams change afterward — an exam
@@ -98,14 +117,16 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
   )
 
   const allDone = summary && summary.total > 0 && summary.completed === summary.total
-  const canSubmit = Boolean(examinerId) && allDone && (!existing || stale)
+  const reportsClear = reportsBlocking.length === 0
+  const canSubmit = Boolean(examinerId) && allDone && reportsClear && (!existing || stale)
 
   let buttonLabel = '✓ Submit this week'
   if (!examinerId) buttonLabel = 'Select an examiner'
-  else if (existing && stale) buttonLabel = allDone ? '↻ Re-submit this week' : `Finish ${incompleteThisWeek.length} to re-submit`
+  else if (existing && stale) buttonLabel = allDone && reportsClear ? '↻ Re-submit this week' : !allDone ? `Finish ${incompleteThisWeek.length} to re-submit` : `${reportsBlocking.length} report${reportsBlocking.length === 1 ? '' : 's'} due to re-submit`
   else if (existing) buttonLabel = '✓ Submitted'
   else if (!summary || summary.total === 0) buttonLabel = 'No exams this week'
   else if (!allDone) buttonLabel = `Finish ${incompleteThisWeek.length} to submit`
+  else if (!reportsClear) buttonLabel = `${reportsBlocking.length} report${reportsBlocking.length === 1 ? '' : 's'} due to submit`
 
   const examinerLabel = examiners.find((e) => e.id === examinerId)?.name
     || (isExaminer ? 'your' : '—')
@@ -154,6 +175,24 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, weekS
         <Stat label={isExaminer ? 'Your Commission' : 'Examiner Commission'} value={`$${money(summary?.commission)}`} />
         <Stat label="Office Use" value={`$${money(summary?.office)}`} />
       </div>
+
+      {/* Report gate notices */}
+      {reportsBlocking.length > 0 && (!existing || stale) && (
+        <div className="week-incomplete week-reports-block">
+          <span className="week-incomplete-label">Reports overdue (past {REPORT_GRACE_BUSINESS_DAYS} business days) — required before submitting:</span>
+          <span className="week-incomplete-names">
+            {reportsBlocking.map((e) => e.client_name).join(', ')}
+          </span>
+        </div>
+      )}
+      {reportsInGrace.length > 0 && (!existing || stale) && (
+        <div className="week-incomplete week-reports-grace">
+          <span className="week-incomplete-label">Reports still due (within the {REPORT_GRACE_BUSINESS_DAYS}-business-day window):</span>
+          <span className="week-incomplete-names">
+            {reportsInGrace.map((e) => e.client_name).join(', ')}
+          </span>
+        </div>
+      )}
 
       {/* Which exams still need financials this week */}
       {(!existing || stale) && incompleteThisWeek.length > 0 && (

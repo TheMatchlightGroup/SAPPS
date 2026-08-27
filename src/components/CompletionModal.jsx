@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { TEST_TYPES } from '../lib/constants'
+import { REPORT_STATUS_LABEL } from '../lib/reportUtils'
 import '../styles/modal.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -16,12 +18,15 @@ const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionD
 export default function CompletionModal({
   exam, examinerName, fetchIntake, onComplete, onDelete, onClose,
   canDelete = false, canEditBooking = false, onEditBooking,
+  report = null, onWaiveReport, onUnwaiveReport,
 }) {
+  const navigate = useNavigate()
   const [fin, setFin] = useState({ copay_amount: '', amount_due_examiner: '', amount_due_sapps: '' })
   const [examType, setExamType] = useState(exam.exam_type || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [busyWaive, setBusyWaive] = useState(false)
   const [loadingIntake, setLoadingIntake] = useState(true)
 
   // Prefill from any existing financials (so re-opening a completed exam edits).
@@ -119,6 +124,53 @@ export default function CompletionModal({
               <CurrencyField label="Amount Due to Examiner" hint="Commission paid to examiner" value={fin.amount_due_examiner} onChange={set('amount_due_examiner')} />
               <CurrencyField label="SAPPS Office Use" hint="Facility / rental fee retained by SAPPS" value={fin.amount_due_sapps} onChange={set('amount_due_sapps')} />
               <div className="total-row"><span>Total</span><span>${money(total)}</span></div>
+
+              {/* Report — agencies expect the written report within 5 business
+                  days. Available once the exam is completed (type is known). */}
+              {exam.status === 'completed' && (
+                <div className="report-block">
+                  <div className="report-block-head">
+                    <span className="report-block-label">Written report</span>
+                    {report && (
+                      <span className={`rp-pill ${report.status}`}>
+                        {REPORT_STATUS_LABEL[report.status] || report.status}
+                      </span>
+                    )}
+                  </div>
+                  {report?.status !== 'waived' ? (
+                    <>
+                      <button
+                        className="btn report-open"
+                        type="button"
+                        onClick={() => { onClose(); navigate(`/reports/exam/${exam.id}`) }}
+                      >
+                        {report ? 'Open report →' : 'Fill out the report →'}
+                      </button>
+                      {!report && (
+                        <label className="report-waive">
+                          <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={async () => { setBusyWaive(true); await onWaiveReport?.(exam); setBusyWaive(false) }}
+                            disabled={busyWaive}
+                          />
+                          <span>No report needed — polygraph terminated</span>
+                        </label>
+                      )}
+                    </>
+                  ) : (
+                    <label className="report-waive">
+                      <input
+                        type="checkbox"
+                        checked
+                        onChange={async () => { setBusyWaive(true); await onUnwaiveReport?.(exam); setBusyWaive(false) }}
+                        disabled={busyWaive}
+                      />
+                      <span>No report needed — polygraph terminated</span>
+                    </label>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

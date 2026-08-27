@@ -7,6 +7,8 @@ import HomePage from './pages/HomePage'
 import CalendarPage from './pages/CalendarPage'
 import PayrollPage from './pages/PayrollPage'
 import InvoicePage from './pages/InvoicePage'
+import ReportsPage from './pages/ReportsPage'
+import ReportEditorPage from './pages/ReportEditorPage'
 
 // Authenticated shell: nav + routed content.
 function AppLayout() {
@@ -35,6 +37,8 @@ export default function App() {
             }
           >
             <Route path="/" element={<CalendarPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/reports/exam/:examId" element={<ReportEditorPage />} />
             <Route
               path="/today"
               element={

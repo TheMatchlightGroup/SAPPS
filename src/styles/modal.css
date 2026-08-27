@@ -90,3 +90,26 @@
 .btn-danger-text:hover:not(:disabled) { background: rgba(155,59,46,.08); }
 .confirm-delete { display: flex; align-items: center; gap: var(--s-3); width: 100%; justify-content: flex-end; }
 .confirm-delete span { font-size: 0.86rem; color: var(--danger); margin-right: auto; }
+
+/* Report block inside the completion modal */
+.report-block {
+  margin-top: var(--s-4); padding: var(--s-3) var(--s-4);
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+  display: flex; flex-direction: column; gap: var(--s-2);
+}
+.report-block-head { display: flex; align-items: center; gap: var(--s-3); }
+.report-block-label { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-700); }
+.report-open {
+  align-self: flex-start;
+  border: 1px solid var(--line-strong); background: #fff; color: var(--ink-900);
+}
+.report-open:hover { border-color: var(--gold-deep, #8a6d1f); }
+.report-waive { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; }
+.report-waive input { width: auto; }
+.rp-pill {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+}
+.rp-pill.draft { background: rgba(176,138,48,.16); color: #8a6d1f; }
+.rp-pill.final { background: rgba(62,107,79,.14); color: #3e6b4f; }
+.rp-pill.waived { background: rgba(90,90,90,.12); color: var(--ink-700); }

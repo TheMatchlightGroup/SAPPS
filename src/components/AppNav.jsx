@@ -27,6 +27,9 @@ export default function AppNav() {
           <Link to="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`}>
             Calendar
           </Link>
+          <Link to="/reports" className={`nav-link ${pathname.startsWith('/reports') ? 'active' : ''}`}>
+            Reports
+          </Link>
           {isAdmin && (
             <Link to="/payroll" className={`nav-link ${pathname === '/payroll' ? 'active' : ''}`}>
               Payroll

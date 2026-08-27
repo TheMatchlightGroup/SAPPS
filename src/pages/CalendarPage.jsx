@@ -15,9 +15,10 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function CalendarPage() {
   const {
-    exams, examiners, examinerName, intakeByExam, weekSubmissions,
+    exams, examiners, examinerName, intakeByExam, reportByExam, weekSubmissions,
     loading, error,
     createBooking, updateBooking, fetchIntake, completeExam, deleteExam, submitWeek,
+    waiveReport, unwaiveReport,
   } = useCalendarData()
 
   const { role } = useAuth()
@@ -52,6 +53,7 @@ export default function CalendarPage() {
         exams={exams}
         examiners={examiners}
         intakeByExam={intakeByExam}
+        reportByExam={reportByExam}
         weekSubmissions={weekSubmissions}
         submitWeek={submitWeek}
       />
@@ -114,6 +116,9 @@ export default function CalendarPage() {
           canDelete={isOffice}
           canEditBooking={isOffice}
           onEditBooking={(exam) => setModal({ type: 'edit', exam })}
+          report={reportByExam[modal.exam.id] || null}
+          onWaiveReport={waiveReport}
+          onUnwaiveReport={unwaiveReport}
         />
       )}
     </div>
