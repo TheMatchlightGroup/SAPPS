@@ -41,6 +41,8 @@ export const ORGANIZATIONS = {
     "Loudoun County Sheriff's Office",
     'Alexandria Dept. of Emergency Communication',
     'Arlington County Fire & Rescue',
+    'Arlington 911',
+    'Arlington Police Department',
     'Prince William County Fire & Rescue',
     'Prince William 911',
     'Prince William Adult Detention Center',
@@ -71,7 +73,22 @@ export const TEST_TYPES = [
   { value: 'Sexual History Retest', abbr: 'SH-R' },
   { value: 'Specific Issue', abbr: 'SI' },
   { value: 'Instant Offense', abbr: 'IO' },
+  { value: 'Probation No Show', abbr: 'P-NS' },
+  { value: 'Pre-Employment No Show', abbr: 'PE-NS' },
 ]
+
+// Billing defaults auto-filled when these types are selected at completion
+// (all fields stay editable). Probation no-shows bill $0.00 — the examiner
+// collects the no-show fee directly. Pre-employment no-shows bill the agency
+// a flat $100 (entered as SAPPS's amount so the invoice line reads $100.00).
+export const TEST_TYPE_BILLING_DEFAULTS = {
+  'Probation No Show': { copay_amount: '0', amount_due_examiner: '0', amount_due_sapps: '0' },
+  'Pre-Employment No Show': { copay_amount: '0', amount_due_examiner: '0', amount_due_sapps: '100' },
+}
+
+// No-shows produce no written report — exempt from the report requirement
+// and the week-submit gate.
+export const NO_REPORT_TYPES = ['Probation No Show', 'Pre-Employment No Show']
 export const TEST_TYPE_ABBR = Object.fromEntries(TEST_TYPES.map((t) => [t.value, t.abbr]))
 
 // ---- Org directory: invoice code + (where known) Bill-To + billing emails ----
@@ -180,6 +197,12 @@ export const ORG_DIRECTORY = {
   'Arlington County Fire & Rescue': {
     code: 'ACFR', // PROVISIONAL code — not on the contact sheet; confirm against contracts
     emails: ['Mhinds@arlingtonva.us', 'Jhill@arlingtonva.us'],
+  },
+  'Arlington 911': {
+    code: 'A911', // PROVISIONAL — added 8/15 per Cris; confirm code + billing emails
+  },
+  'Arlington Police Department': {
+    code: 'APD', // PROVISIONAL — added 8/15 per Cris; confirm code + billing emails
   },
   'Prince William County Fire & Rescue': {
     code: 'PWCFR',

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { TEST_TYPES } from '../lib/constants'
+import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES } from '../lib/constants'
 import { REPORT_STATUS_LABEL } from '../lib/reportUtils'
 import '../styles/modal.css'
 
@@ -109,7 +109,15 @@ export default function CompletionModal({
             <>
               <div className="field">
                 <label>Test type</label>
-                <select value={examType} onChange={(e) => setExamType(e.target.value)}>
+                <select
+                  value={examType}
+                  onChange={(e) => {
+                    const t = e.target.value
+                    setExamType(t)
+                    // No-show types auto-fill their billing amounts (still editable).
+                    if (TEST_TYPE_BILLING_DEFAULTS[t]) setFin({ ...TEST_TYPE_BILLING_DEFAULTS[t] })
+                  }}
+                >
                   <option value="" disabled>Select…</option>
                   {TEST_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>{t.value} ({t.abbr})</option>
@@ -127,7 +135,18 @@ export default function CompletionModal({
 
               {/* Report — agencies expect the written report within 5 business
                   days. Available once the exam is completed (type is known). */}
-              {exam.status === 'completed' && (
+              {exam.status === 'completed' && NO_REPORT_TYPES.includes(exam.exam_type) && (
+                <div className="report-block">
+                  <div className="report-block-head">
+                    <span className="report-block-label">Written report</span>
+                    <span className="rp-pill waived">Not required</span>
+                  </div>
+                  <p className="mnote" style={{ fontSize: '0.8rem', opacity: 0.65, margin: 0 }}>
+                    No-shows don't require a written report.
+                  </p>
+                </div>
+              )}
+              {exam.status === 'completed' && !NO_REPORT_TYPES.includes(exam.exam_type) && (
                 <div className="report-block">
                   <div className="report-block-head">
                     <span className="report-block-label">Written report</span>

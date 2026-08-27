@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { startOfWeek, endOfWeek, addWeeks, subWeeks, format, parseISO } from 'date-fns'
 import { useAuth } from '../context/AuthContext'
 import { reportOverdue, reportSatisfied, REPORT_GRACE_BUSINESS_DAYS } from '../lib/reportUtils'
+import { NO_REPORT_TYPES } from '../lib/constants'
 import WeekCompleteModal from './WeekCompleteModal'
 import '../styles/week-summary.css'
 
@@ -91,7 +92,7 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
   // exams get a grace window (reminder, not a block).
   const reportsMissing = useMemo(
     () => (summary
-      ? summary.weekExams.filter((e) => e.status === 'completed' && !reportSatisfied(reportByExam[e.id]))
+      ? summary.weekExams.filter((e) => e.status === 'completed' && !NO_REPORT_TYPES.includes(e.exam_type) && !reportSatisfied(reportByExam[e.id]))
       : []),
     [summary, reportByExam]
   )
