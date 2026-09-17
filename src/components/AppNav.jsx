@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import ChangePasswordModal from './ChangePasswordModal'
 
 export default function AppNav() {
   const { pathname } = useLocation()
@@ -7,8 +9,11 @@ export default function AppNav() {
 
   // Today / Payroll / Invoicing are admin-only; examiners just see Calendar.
   const isAdmin = role === 'payroll_admin'
+  const [pwOpen, setPwOpen] = useState(false)
+  const mustChange = Boolean(profile?.must_change_password)
 
   return (
+    <>
     <nav className="app-nav">
       <div className="nav-brand">
         <span className="nav-mark" aria-hidden="true">
@@ -48,8 +53,17 @@ export default function AppNav() {
             <span className="role-pill">{role?.replace('_', ' ')}</span>
           </span>
         )}
+        <button className="btn btn-ghost nav-pw" onClick={() => setPwOpen(true)} title="Change password">Change password</button>
         <button className="btn btn-ghost" onClick={signOut}>Sign out</button>
       </div>
     </nav>
+    {mustChange && !pwOpen && (
+      <div className="pw-banner" role="status">
+        <span>You're signed in with a temporary password.</span>
+        <button className="pw-banner-btn" onClick={() => setPwOpen(true)}>Set your own password →</button>
+      </div>
+    )}
+    {pwOpen && <ChangePasswordModal required={mustChange} onClose={() => setPwOpen(false)} />}
+    </>
   )
 }

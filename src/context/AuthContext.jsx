@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
     // maybeSingle() returns null (no error) when the row doesn't exist yet.
     let { data, error } = await supabase
       .from('users')
-      .select('id, name, email, role, active')
+      .select('id, name, email, role, active, must_change_password')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -52,7 +52,7 @@ export function AuthProvider({ children }) {
       }
       const res = await supabase
         .from('users')
-        .select('id, name, email, role, active')
+        .select('id, name, email, role, active, must_change_password')
         .eq('id', user.id)
         .single()
       data = res.data
@@ -105,6 +105,18 @@ export function AuthProvider({ children }) {
   const signUp = (email, password, name) =>
     supabase.auth.signUp({ email, password, options: { data: { name } } })
 
+  // Change the signed-in user's password. On success, clear the temp-password
+  // flag on their profile row (via a security-definer RPC — users can't update
+  // their own row directly) and reflect it locally so the banner disappears.
+  const updatePassword = useCallback(async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) return { error: error.message }
+    const { error: rpcErr } = await supabase.rpc('complete_password_change')
+    if (rpcErr) console.warn('Could not clear must_change_password flag:', rpcErr.message)
+    setProfile((p) => (p ? { ...p, must_change_password: false } : p))
+    return { error: null }
+  }, [])
+
   const signOut = () => supabase.auth.signOut()
 
   const value = {
@@ -116,6 +128,7 @@ export function AuthProvider({ children }) {
     signIn,
     signUp,
     signOut,
+    updatePassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

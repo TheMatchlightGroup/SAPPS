@@ -68,3 +68,18 @@
 }
 
 .center-screen { min-height: 100%; display: grid; place-items: center; color: var(--ink-700); }
+
+/* Change password (nav) + temp-password banner */
+.nav-pw { white-space: nowrap; }
+.pw-banner {
+  display: flex; align-items: center; justify-content: center; gap: var(--s-4); flex-wrap: wrap;
+  background: var(--gold); color: var(--ink-900); font-size: 0.9rem; font-weight: 500;
+  padding: 10px var(--s-5);
+}
+.pw-banner-btn {
+  background: var(--ink-900); color: var(--cream); border: 0; border-radius: 999px;
+  padding: 6px 14px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.pw-banner-btn:hover { opacity: .9; }
+@media (max-width: 720px) { .nav-pw { font-size: 0.8rem; padding-inline: 8px; } }
+@media print { .pw-banner { display: none; } }

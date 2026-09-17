@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useInvoiceData } from '../hooks/useInvoiceData'
 import { COMPANY, orgCode, orgBillTo, orgEmails } from '../lib/constants'
@@ -20,7 +20,7 @@ function shiftMonth(ym, delta) {
 }
 
 export default function InvoicePage() {
-  const { exams, intakeByExam, loading, sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor, poFor, savePo } = useInvoiceData()
+  const { exams, intakeByExam, loading, sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor, poFor, savePo, detailsFor, saveDetails } = useInvoiceData()
   const [month, setMonth] = useState(thisMonth())
   const [selectedOrg, setSelectedOrg] = useState(null)
 
@@ -70,6 +70,8 @@ export default function InvoicePage() {
         sent={sentStatus(selectedOrg, month)}
         savedPo={poFor(selectedOrg)}
         onSavePo={savePo}
+        savedDetails={detailsFor(selectedOrg, month)}
+        onSaveDetails={saveDetails}
         onMarkSent={markInvoiceSent}
         onUnmark={unmarkInvoiceSent}
         onBack={() => setSelectedOrg(null)}
@@ -160,7 +162,7 @@ function ClientRow({ ent, onOpen }) {
   )
 }
 
-function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent, savedPo, onSavePo, onMarkSent, onUnmark, onBack }) {
+function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent, savedPo, onSavePo, savedDetails, onSaveDetails, onMarkSent, onUnmark, onBack }) {
   const [editing, setEditing] = useState(false)
   const [emailPanel, setEmailPanel] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -201,9 +203,43 @@ function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent,
   }, { amount: 0, copay: 0, due: 0 })
 
   const [y, m] = month.split('-')
-  const invoiceNumber = `S${y.slice(2)}-${orgCode(org)}-${Number(m)}`
   const billTo = orgBillTo(org)
   const emails = orgEmails(org)
+
+  // ---- Invoice header: pre-filled, editable via the pencil ----
+  // Defaults: number from the org code, label from the month, date = today
+  // (or the day it was marked sent, so re-prints don't drift). Any field
+  // payroll edits is saved per org+month and overrides the default.
+  const defaults = {
+    invoice_no: `S${y.slice(2)}-${orgCode(org)}-${Number(m)}`,
+    services_label: MONTHS[Number(m)],
+    invoice_date: sent?.sent_at ? format(parseISO(sent.sent_at), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+  }
+  const effective = {
+    invoice_no: savedDetails?.invoice_no || defaults.invoice_no,
+    services_label: savedDetails?.services_label || defaults.services_label,
+    invoice_date: savedDetails?.invoice_date || defaults.invoice_date,
+  }
+  const invoiceNumber = effective.invoice_no
+
+  const [metaEditing, setMetaEditing] = useState(false)
+  const [meta, setMeta] = useState(effective)
+  const metaRef = useRef(null)
+  useEffect(() => { if (!metaEditing) setMeta(effective) }, [savedDetails, org, month, sent]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function commitMeta() {
+    setMetaEditing(false)
+    const changed = ['invoice_no', 'services_label', 'invoice_date'].some((k) => (meta[k] || '') !== (effective[k] || ''))
+    if (!changed) return
+    const { error } = await onSaveDetails({ organization: org, month, ...meta })
+    if (error) setErr(error)
+  }
+  function cancelMeta() { setMeta(effective); setMetaEditing(false) }
+  function metaKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commitMeta() }
+    if (e.key === 'Escape') { e.preventDefault(); cancelMeta() }
+  }
+  const prettyDate = (iso) => { try { return format(parseISO(iso), 'M/d/yy') } catch { return iso } }
 
   async function mark(method) {
     setBusy(true); setErr('')
@@ -285,25 +321,44 @@ function InvoiceDetail({ org, month, monthLabel, exams, amountOf, copayOf, sent,
             <div className="inv-label">Bill To</div>
             {billTo.map((l, i) => <div key={i} className={i === 0 ? 'inv-billto-name' : 'inv-billto-line'}>{l}</div>)}
           </div>
-          <div className="inv-meta">
-            <div><span>Invoice #</span><strong>{invoiceNumber}</strong></div>
-            <div><span>Month of Services</span><strong>{MONTHS[Number(m)]}</strong></div>
-            <div><span>Date of Invoice</span><strong>{format(new Date(), 'M/d/yy')}</strong></div>
-            {editing ? (
-              <div className="inv-po-edit">
-                <span>PO Number</span>
-                <input
-                  className="inv-edit"
-                  type="text"
-                  placeholder="none"
-                  value={po}
-                  onChange={(e) => setPo(e.target.value)}
-                  onBlur={persistPo}
-                />
-              </div>
-            ) : po.trim() ? (
-              <div><span>PO Number</span><strong>{po.trim()}</strong></div>
-            ) : null}
+          <div className={`inv-meta${metaEditing ? ' editing' : ''}`} ref={metaRef}>
+            {!metaEditing && (
+              <button className="inv-meta-pencil" type="button" title="Edit invoice number, month, or date" aria-label="Edit invoice details" onClick={() => setMetaEditing(true)}>✎</button>
+            )}
+            {metaEditing ? (
+              <>
+                <div className="inv-meta-edit"><span>Invoice #</span>
+                  <input className="inv-edit" type="text" value={meta.invoice_no} onChange={(e) => setMeta({ ...meta, invoice_no: e.target.value })} onKeyDown={metaKey} autoFocus />
+                </div>
+                <div className="inv-meta-edit"><span>Month of Services</span>
+                  <input className="inv-edit" type="text" value={meta.services_label} onChange={(e) => setMeta({ ...meta, services_label: e.target.value })} onKeyDown={metaKey} />
+                </div>
+                <div className="inv-meta-edit"><span>Date of Invoice</span>
+                  <input className="inv-edit" type="date" value={meta.invoice_date} onChange={(e) => setMeta({ ...meta, invoice_date: e.target.value })} onKeyDown={metaKey} />
+                </div>
+                <div className="inv-meta-edit"><span>PO Number</span>
+                  <input className="inv-edit" type="text" placeholder="none" value={po} onChange={(e) => setPo(e.target.value)} onBlur={persistPo} onKeyDown={metaKey} />
+                </div>
+                <div className="inv-meta-actions">
+                  <button type="button" className="btn-meta ghost" onClick={cancelMeta}>Cancel</button>
+                  <button type="button" className="btn-meta" onClick={() => { persistPo(); commitMeta() }}>✓ Done</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div><span>Invoice #</span><strong>{effective.invoice_no}</strong></div>
+                <div><span>Month of Services</span><strong>{effective.services_label}</strong></div>
+                <div><span>Date of Invoice</span><strong>{prettyDate(effective.invoice_date)}</strong></div>
+                {editing ? (
+                  <div className="inv-po-edit">
+                    <span>PO Number</span>
+                    <input className="inv-edit" type="text" placeholder="none" value={po} onChange={(e) => setPo(e.target.value)} onBlur={persistPo} />
+                  </div>
+                ) : po.trim() ? (
+                  <div><span>PO Number</span><strong>{po.trim()}</strong></div>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
 

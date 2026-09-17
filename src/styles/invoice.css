@@ -186,7 +186,26 @@
 }
 .inv-billto-name { font-weight: 700; font-size: 1rem; }
 .inv-billto-line { font-size: 0.9rem; color: var(--ink-700); line-height: 1.5; }
-.inv-meta { text-align: right; }
+.inv-meta { text-align: right; position: relative; padding-right: 30px; border-radius: 8px; transition: background .15s; }
+.inv-meta:hover { background: rgba(196,162,76,.08); }
+.inv-meta.editing { background: rgba(196,162,76,.12); padding: 10px 12px 10px 12px; }
+.inv-meta-pencil {
+  position: absolute; right: 2px; top: -2px; width: 26px; height: 26px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--gold-deep); font-size: 1rem; line-height: 26px; cursor: pointer;
+  opacity: 0; transition: opacity .15s, background .15s;
+}
+.inv-meta:hover .inv-meta-pencil, .inv-meta-pencil:focus-visible { opacity: 1; }
+.inv-meta-pencil:hover { background: rgba(196,162,76,.22); }
+.inv-meta-edit { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 6px; }
+.inv-meta-edit .inv-edit { width: 170px; text-align: right; font-family: var(--font-display); font-size: 1rem; }
+.inv-meta-edit .inv-edit[type="date"] { text-align: right; }
+.inv-meta-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.btn-meta {
+  border: 0; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  background: var(--gold); color: var(--ink-900);
+}
+.btn-meta.ghost { background: transparent; color: var(--gold-deep); border: 1px solid rgba(127,97,20,.4); }
+.btn-meta:hover { filter: brightness(.96); }
 .inv-meta > div { margin-bottom: 6px; }
 .inv-meta span {
   display: inline-block; font-size: 0.72rem; letter-spacing: 0.04em;
@@ -236,6 +255,8 @@
 
 /* ---- Print: show only the sheet, clean page ---- */
 @media print {
+  .inv-meta { padding-right: 0; background: transparent !important; }
+  .inv-meta-pencil, .inv-meta-actions { display: none !important; }
   @page { margin: 0.5in; }
   body { background: #fff; }
   .app-nav, .invoice-controls,

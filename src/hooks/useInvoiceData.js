@@ -15,6 +15,7 @@ export function useInvoiceData() {
   const [intakeByExam, setIntakeByExam] = useState({})
   const [sentByKey, setSentByKey] = useState({})     // `${organization}__${month}` -> invoice row
   const [poByOrg, setPoByOrg] = useState({})         // organization -> saved PO number
+  const [detailsByKey, setDetailsByKey] = useState({}) // `${organization}__${month}` -> header overrides
   const [submissions, setSubmissions] = useState([])
   const [examiners, setExaminers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,7 +24,7 @@ export function useInvoiceData() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [examRes, intakeRes, invRes, weekRes, userRes, poRes] = await Promise.all([
+    const [examRes, intakeRes, invRes, weekRes, userRes, poRes, detRes] = await Promise.all([
       supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_type, organization, status, examiner_id')
@@ -43,6 +44,9 @@ export function useInvoiceData() {
       supabase
         .from('org_pos')
         .select('organization, po_number'),
+      supabase
+        .from('invoice_details')
+        .select('organization, month, invoice_no, services_label, invoice_date'),
     ])
     if (examRes.error) setError(examRes.error.message)
 
@@ -55,12 +59,16 @@ export function useInvoiceData() {
     const pos = {}
     for (const r of poRes.data || []) pos[r.organization] = r.po_number
 
+    const det = {}
+    for (const r of detRes.data || []) det[`${r.organization}__${r.month}`] = r
+
     const all = examRes.data || []
     setAllExams(all)
     setExams(all.filter((e) => e.status === 'completed'))
     setIntakeByExam(map)
     setSentByKey(sent)
     setPoByOrg(pos)
+    setDetailsByKey(det)
     setSubmissions(weekRes.data || [])
     setExaminers((userRes.data || []).filter((u) => u.is_examiner && u.active))
     setLoading(false)
@@ -137,6 +145,32 @@ export function useInvoiceData() {
     return { error: null }
   }
 
+  // Header overrides (invoice #, month-of-services label, invoice date) for
+  // one org+month. Null fields mean "use the app's default".
+  const detailsFor = useCallback(
+    (organization, month) => detailsByKey[`${organization}__${month}`] || null,
+    [detailsByKey]
+  )
+
+  // Save header overrides. Pass only the fields being set; blank strings clear
+  // a field back to the default. Upsert on (organization, month).
+  async function saveDetails({ organization, month, invoice_no, services_label, invoice_date }) {
+    const { data: u } = await supabase.auth.getUser()
+    const row = {
+      organization,
+      month,
+      invoice_no: (invoice_no || '').trim() || null,
+      services_label: (services_label || '').trim() || null,
+      invoice_date: invoice_date || null,
+      updated_at: new Date().toISOString(),
+      updated_by: u?.user?.email ?? null,
+    }
+    const { error } = await supabase.from('invoice_details').upsert(row, { onConflict: 'organization,month' })
+    if (error) return { error: error.message }
+    setDetailsByKey((m) => ({ ...m, [`${organization}__${month}`]: row }))
+    return { error: null }
+  }
+
   // Undo a "sent" mark (mistakes happen).
   async function unmarkInvoiceSent({ organization, month }) {
     const { error } = await supabase
@@ -152,6 +186,6 @@ export function useInvoiceData() {
   return {
     exams, intakeByExam, billableOrgs, loading, error, refetch: load,
     sentStatus, markInvoiceSent, unmarkInvoiceSent, monthCloseFor,
-    poFor, savePo,
+    poFor, savePo, detailsFor, saveDetails,
   }
 }
