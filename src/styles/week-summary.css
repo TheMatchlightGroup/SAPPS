@@ -100,3 +100,5 @@
 /* Report-gate notices */
 .week-reports-block { border-color: rgba(176, 60, 48, .4); background: rgba(176, 60, 48, .07); }
 .week-reports-grace { border-color: rgba(176, 138, 48, .35); background: rgba(176, 138, 48, .07); }
+
+@media (max-width: 640px) { .week-nav { flex-wrap: wrap; row-gap: 8px; } }

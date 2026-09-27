@@ -83,3 +83,25 @@
 .pw-banner-btn:hover { opacity: .9; }
 @media (max-width: 720px) { .nav-pw { font-size: 0.8rem; padding-inline: 8px; } }
 @media print { .pw-banner { display: none; } }
+
+/* Narrow screens (phones, tablets, split windows): nav wraps to two rows —
+   brand + account, then scrollable links. The full admin nav needs ~1080px. */
+@media (max-width: 1080px) {
+  .app-nav { flex-wrap: wrap; height: auto; padding: 10px var(--s-4); gap: 8px; }
+  .nav-brand h1 { font-size: 1rem; }
+  .nav-right { width: 100%; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .nav-links {
+    order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap;
+    scrollbar-width: none; margin: 0 -4px;
+  }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-link { padding: 7px 11px; white-space: nowrap; font-size: 0.9rem; }
+  .nav-user { margin-right: auto; font-size: 0.8rem; }
+  .nav-right .btn { padding: 5px 10px; font-size: 0.8rem; }
+}
+@media (max-width: 760px) { .app-main { padding: var(--s-5) var(--s-4); } }
+@media (max-width: 480px) {
+  .nav-user .role-pill { display: none; }
+  .nav-user { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-right .btn { white-space: nowrap; }
+}

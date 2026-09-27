@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { withColors } from '../lib/examinerColors'
 
 // Central data layer: exams, examiner roster, financials (intake_forms),
 // and week submissions. RLS decides who sees and does what.
@@ -11,13 +12,18 @@ export function useCalendarData() {
   const [intakeByExam, setIntakeByExam] = useState({})
   const [reportByExam, setReportByExam] = useState({})
   const [weekSubmissions, setWeekSubmissions] = useState([])
+  // Office-only (RLS returns nothing to examiners / team leads).
+  // Keyed `${examiner_id}__${date}` -> { examiner_id, date, note }
+  const [availability, setAvailability] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Loading starts true for the first fetch only. Refetches after a save
+  // happen quietly in the background, so the calendar (and an open day
+  // drawer) doesn't blink out to "Loading…" every time something changes.
   const load = useCallback(async () => {
-    setLoading(true)
     setError('')
-    const [examRes, examinerRes, intakeRes, weekRes, reportRes] = await Promise.all([
+    const [examRes, examinerRes, intakeRes, weekRes, reportRes, availRes] = await Promise.all([
       supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_time, exam_type, organization, duration_minutes, status, examiner_id')
@@ -27,7 +33,7 @@ export function useCalendarData() {
       // Cris is payroll_admin AND runs her own exams.
       supabase
         .from('users')
-        .select('id, name')
+        .select('id, name, color')
         .eq('is_examiner', true)
         .eq('active', true)
         .order('name', { ascending: true }),
@@ -41,6 +47,9 @@ export function useCalendarData() {
       supabase
         .from('reports')
         .select('id, exam_id, status'),
+      supabase
+        .from('examiner_availability')
+        .select('examiner_id, date, note'),
     ])
     if (examRes.error) setError(examRes.error.message)
 
@@ -51,10 +60,13 @@ export function useCalendarData() {
     for (const row of reportRes.data || []) if (row.exam_id) reportMap[row.exam_id] = row
 
     setExams(examRes.data || [])
-    setExaminers(examinerRes.data || [])
+    setExaminers(withColors(examinerRes.data || []))
     setIntakeByExam(intakeMap)
     setReportByExam(reportMap)
     setWeekSubmissions(weekRes.data || [])
+    const avail = {}
+    for (const r of availRes.data || []) avail[`${r.examiner_id}__${r.date}`] = r
+    setAvailability(avail)
     setLoading(false)
   }, [])
 
@@ -64,6 +76,64 @@ export function useCalendarData() {
     (id) => examiners.find((e) => e.id === id)?.name || 'Unassigned',
     [examiners]
   )
+  const examinerColor = useCallback(
+    (id) => examiners.find((e) => e.id === id)?.color || null,
+    [examiners]
+  )
+
+  // ---- Availability (office) ----
+  // Paint strokes change many days at once, so this takes a batch:
+  // `adds` / `removes` are [{ examiner_id, date }]. The calendar updates
+  // instantly; the database write follows, and a failure reloads truth.
+  const changeAvailability = useCallback(async ({ adds = [], removes = [] }) => {
+    if (!adds.length && !removes.length) return { error: null }
+    setAvailability((m) => {
+      const next = { ...m }
+      for (const a of adds) next[`${a.examiner_id}__${a.date}`] = { examiner_id: a.examiner_id, date: a.date, note: m[`${a.examiner_id}__${a.date}`]?.note ?? null }
+      for (const r of removes) delete next[`${r.examiner_id}__${r.date}`]
+      return next
+    })
+    const who = user?.email ?? null
+    const now = new Date().toISOString()
+    const errors = []
+    if (adds.length) {
+      const { error } = await supabase.from('examiner_availability').upsert(
+        adds.map((a) => ({ examiner_id: a.examiner_id, date: a.date, updated_at: now, updated_by: who })),
+        { onConflict: 'examiner_id,date', ignoreDuplicates: true }
+      )
+      if (error) errors.push(error.message)
+    }
+    // Deletes grouped per examiner: one request each.
+    const byExaminer = {}
+    for (const r of removes) (byExaminer[r.examiner_id] ||= []).push(r.date)
+    for (const [examinerId, dates] of Object.entries(byExaminer)) {
+      const { error } = await supabase.from('examiner_availability').delete()
+        .eq('examiner_id', examinerId).in('date', dates)
+      if (error) errors.push(error.message)
+    }
+    if (errors.length) { await load(); return { error: errors[0] } }
+    return { error: null }
+  }, [user, load]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setAvailabilityNote = useCallback(async (examinerId, date, note) => {
+    const clean = (note || '').trim() || null
+    setAvailability((m) => {
+      const k = `${examinerId}__${date}`
+      return m[k] ? { ...m, [k]: { ...m[k], note: clean } } : m
+    })
+    const { error } = await supabase.from('examiner_availability')
+      .update({ note: clean, updated_at: new Date().toISOString(), updated_by: user?.email ?? null })
+      .eq('examiner_id', examinerId).eq('date', date)
+    return { error: error?.message || null }
+  }, [user])
+
+  // Tier 3: change an examiner's calendar color.
+  const setExaminerColor = useCallback(async (examinerId, hex) => {
+    setExaminers((xs) => xs.map((e) => (e.id === examinerId ? { ...e, color: hex } : e)))
+    const { error } = await supabase.from('users').update({ color: hex }).eq('id', examinerId)
+    if (error) { await load(); return { error: error.message } }
+    return { error: null }
+  }, [load])
 
   async function createBooking(form) {
     const { error } = await supabase.from('exams').insert({
@@ -206,7 +276,8 @@ export function useCalendarData() {
   }
 
   return {
-    exams, examiners, examinerName, intakeByExam, reportByExam, weekSubmissions,
+    exams, examiners, examinerName, examinerColor, intakeByExam, reportByExam, weekSubmissions,
+    availability, changeAvailability, setAvailabilityNote, setExaminerColor,
     loading, error, refetch: load,
     createBooking, updateBooking, fetchIntake, completeExam, deleteExam, submitWeek,
     waiveReport, unwaiveReport,

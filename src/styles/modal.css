@@ -133,3 +133,10 @@
   background: var(--paper); border: 1px solid var(--line);
   font-size: 0.82rem; color: var(--ink-700);
 }
+
+/* Soft availability warning in the booking modal — informs, never blocks. */
+.field-warn {
+  display: block; margin-top: 6px; padding: 6px 9px; border-radius: var(--radius);
+  font-size: 0.8rem; color: #7a4a12;
+  background: rgba(196,162,76,.16); border: 1px solid rgba(196,162,76,.45);
+}

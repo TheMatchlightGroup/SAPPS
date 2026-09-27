@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { format, parseISO } from 'date-fns'
 import { ORGANIZATIONS } from '../lib/constants'
 import '../styles/modal.css'
 
@@ -14,7 +15,13 @@ const todayISO = () => {
 // Pass `exam` to edit an existing booking (reshuffles, name fixes, swaps);
 // omit it to create a new one. `onSave(form)` handles both — the caller
 // decides whether that's an insert or an update.
-export default function BookingModal({ examiners, defaultDate, exam, onClose, onSave }) {
+//
+// Availability (office): `isAvailable(examinerId, date)` puts that day's
+// available examiners at the top of the dropdown, and picking someone who
+// isn't marked available shows a soft warning — never a block. The warning
+// only appears once availability has been entered for that month
+// (`hasAvailabilityFor`), so an unpainted month doesn't nag on every booking.
+export default function BookingModal({ examiners, defaultDate, exam, onClose, onSave, isAvailable = null, hasAvailabilityFor = () => false }) {
   const editing = Boolean(exam)
 
   const [form, setForm] = useState(() =>
@@ -40,6 +47,14 @@ export default function BookingModal({ examiners, defaultDate, exam, onClose, on
   const [busy, setBusy] = useState(false)
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  const tracking = Boolean(isAvailable) && Boolean(form.exam_date) && hasAvailabilityFor(form.exam_date)
+  const availableHere = tracking ? examiners.filter((e) => isAvailable(e.id, form.exam_date)) : []
+  const others = tracking ? examiners.filter((e) => !isAvailable(e.id, form.exam_date)) : examiners
+  const dayLabel = form.exam_date ? format(parseISO(form.exam_date), 'EEE, MMM d') : ''
+  const picked = examiners.find((e) => e.id === form.examiner_id)
+  const pickedNote = picked && tracking ? isAvailable(picked.id, form.exam_date)?.note : null
+  const offDay = Boolean(picked) && tracking && !isAvailable(picked.id, form.exam_date)
 
   async function handleSubmit() {
     setError('')
@@ -97,8 +112,29 @@ export default function BookingModal({ examiners, defaultDate, exam, onClose, on
               <label>Assigned examiner</label>
               <select value={form.examiner_id} onChange={set('examiner_id')}>
                 <option value="">Unassigned</option>
-                {examiners.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                {tracking ? (
+                  <>
+                    <optgroup label={availableHere.length ? `Available ${dayLabel}` : `Nobody marked available ${dayLabel}`}>
+                      {availableHere.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {'● '}{e.name}{isAvailable(e.id, form.exam_date)?.note ? ` — ${isAvailable(e.id, form.exam_date).note}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Not marked available">
+                      {others.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </optgroup>
+                  </>
+                ) : (
+                  examiners.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)
+                )}
               </select>
+              {offDay && (
+                <span className="field-warn" role="status">
+                  {picked.name.split(' ')[0]} isn't marked available on {dayLabel}. You can still book.
+                </span>
+              )}
+              {pickedNote && <span className="field-hint">Note for this day: {pickedNote}</span>}
               {examiners.length === 0 && (
                 <span className="field-hint">
                   No examiners yet — create examiner accounts and they'll appear here.
