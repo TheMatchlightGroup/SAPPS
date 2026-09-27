@@ -23,19 +23,34 @@ export default function DayDrawer({
 
   // Keep the page behind from scrolling while the drawer is open (mobile),
   // and move focus into the drawer for keyboard users.
+  // …and hand focus back to whatever opened it (the day or "+N more").
   useEffect(() => {
+    const opener = document.activeElement
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     panelRef.current?.focus()
-    return () => { document.body.style.overflow = prev }
+    return () => {
+      document.body.style.overflow = prev
+      if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus()
+    }
   }, [])
+
+  // Keep Tab inside the drawer while it's open (it's a modal dialog).
+  function trapTab(e) {
+    if (e.key !== 'Tab' || !panelRef.current) return
+    const items = [...panelRef.current.querySelectorAll('button:not([disabled]), input, [tabindex="0"]')]
+    if (!items.length) return
+    const first = items[0], last = items[items.length - 1]
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) { e.preventDefault(); last.focus() }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+  }
 
   const available = showAvailability ? examiners.filter((ex) => availableFor(ex.id)) : []
 
   return (
     <>
       <div className="dd-backdrop" onClick={onClose} aria-hidden="true" />
-      <aside className="day-drawer" role="dialog" aria-modal="true" aria-labelledby="dd-title" tabIndex={-1} ref={panelRef}>
+      <aside className="day-drawer" role="dialog" aria-modal="true" aria-labelledby="dd-title" tabIndex={-1} ref={panelRef} onKeyDown={trapTab}>
         <header className="dd-head">
           <div className="dd-when">
             <span className="dd-dow">{format(d, 'EEEE')}</span>

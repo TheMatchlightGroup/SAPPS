@@ -43,7 +43,7 @@ const tables = {
 function q(table) {
   let rows = tables[table] || []; let filters = []; let mode = 'select'; let payload = null; let one = false; let conflict = null
   const api = {
-    select() { return api }, order() { return api }, limit() { return api },
+    select() { return api }, order() { return api }, limit() { return api }, range() { return api },
     eq(k, v) { filters.push((r) => r[k] === v); return api },
     in(k, vs) { filters.push((r) => vs.includes(r[k])); return api },
     maybeSingle() { one = 'maybe'; return api }, single() { one = true; return api },

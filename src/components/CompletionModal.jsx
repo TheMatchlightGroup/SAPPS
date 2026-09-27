@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES } from '../lib/constants'
 import { REPORT_STATUS_LABEL } from '../lib/reportUtils'
-import { DEFAULT_EXAM_AMOUNT, initialExamAmount } from '../lib/amounts'
+import { DEFAULT_EXAM_AMOUNT, initialExamAmount, normalizeIntake } from '../lib/amounts'
 import { canAdjustCompletion, isOffice } from '../lib/roles'
 import { useAuth } from '../context/AuthContext'
 import '../styles/modal.css'
@@ -54,8 +54,9 @@ export default function CompletionModal({
   // Prefill from any existing financials (so re-opening a completed exam edits).
   useEffect(() => {
     let active = true
-    fetchIntake(exam.id).then(({ data }) => {
+    fetchIntake(exam.id).then(({ data: raw }) => {
       if (!active) return
+      const data = normalizeIntake(raw, exam.exam_type)
       const typeDefault = TEST_TYPE_BILLING_DEFAULTS[exam.exam_type]?.exam_amount
       if (data) {
         setFin({
@@ -99,8 +100,14 @@ export default function CompletionModal({
     if (fin.exam_amount === '' || fin.copay_amount === '' || fin.amount_due_examiner === '' || fin.amount_due_sapps === '') {
       return setError('Fill in every amount (enter 0 if not applicable).')
     }
+    if (['exam_amount', 'copay_amount', 'amount_due_examiner', 'amount_due_sapps'].some((k) => Number(fin[k]) < 0 || Number.isNaN(Number(fin[k])))) {
+      return setError('Amounts can\u2019t be negative.')
+    }
     if (num(fin.copay_amount) > num(fin.exam_amount)) {
-      return setError(`Copay ($${money(fin.copay_amount)}) can't be more than the Exam Amount ($${money(fin.exam_amount)}) — the invoice would go negative.`)
+      return setError(
+        `Copay ($${money(fin.copay_amount)}) can't be more than the Exam Amount ($${money(fin.exam_amount)}) — the invoice would go negative.` +
+        (canEditExamAmount ? '' : ' If the Exam Amount needs to change, ask a team lead or the office.')
+      )
     }
     setBusy(true)
     const { error } = await onComplete(exam, { ...fin, exam_type: examType })

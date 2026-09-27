@@ -18,6 +18,22 @@
 
 export const DEFAULT_EXAM_AMOUNT = 225
 
+/**
+ * Read-side fix-up for ONE legacy pattern (nothing in the database is
+ * changed): before Exam Amount existed, a Pre-Employment No Show put its
+ * $100 bill in amount_due_sapps ("Office Use") so the invoice would read
+ * $100. Under today's model Office Use is the examiner's rent, so read
+ * that row as Exam Amount $100 / Office Use $0 — otherwise it would show
+ * the examiner −$100 net pay. Rows with an exam_amount are untouched.
+ */
+export function normalizeIntake(f, examType) {
+  if (!f || hasExamAmount(f)) return f
+  if (examType === 'Pre-Employment No Show') {
+    return { ...f, exam_amount: (Number(f.amount_due_examiner) || 0) + (Number(f.amount_due_sapps) || 0), amount_due_sapps: 0 }
+  }
+  return f
+}
+
 const n = (v) => Number(v) || 0
 
 export const hasExamAmount = (f) => f?.exam_amount !== null && f?.exam_amount !== undefined && f?.exam_amount !== ''
@@ -39,9 +55,11 @@ export const examinerNetOf = (f) => commissionOf(f) - officeUseOf(f)
 
 /**
  * Starting value for the modal's Exam Amount field on an exam that
- * has no exam_amount yet: the legacy amount it already bills (so
- * opening and saving never silently changes an invoice), or the
- * $225 default when there's nothing to go on.
+ * has no exam_amount yet: the legacy amount it already bills when
+ * that's above $0 (so opening and saving doesn't change the invoice),
+ * the no-show amount for no-show types, otherwise the $225 default.
+ * Only Tier 2+ can open a completed exam for editing, and they see
+ * this value in the field before saving.
  */
 export function initialExamAmount(f, typeDefault) {
   if (hasExamAmount(f)) return f.exam_amount

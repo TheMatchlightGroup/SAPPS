@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { computeMonthClose } from '../lib/monthClose'
+import { fetchAll } from '../lib/fetchAll'
 
 const thisMonth = () => {
   const d = new Date() // local month, not UTC
@@ -21,7 +22,7 @@ export function useHomeData() {
   const load = useCallback(async () => {
     const month = thisMonth()
     const [examRes, invRes, weekRes, userRes] = await Promise.all([
-      supabase.from('exams').select('id, client_name, organization, exam_date, status, examiner_id'),
+      fetchAll(() => supabase.from('exams').select('id, client_name, organization, exam_date, status, examiner_id').order('id')),
       supabase.from('invoices').select('organization, month'),
       supabase.from('week_submissions').select('id, examiner_id, week_start, week_end'),
       supabase.from('users').select('id, name, email, role, active, is_examiner'),

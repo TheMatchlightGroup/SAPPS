@@ -113,7 +113,10 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
     existing && summary && (
       Number(existing.total_exams) !== summary.total ||
       Number(existing.completed_exams) !== summary.completed ||
-      Math.abs(Number(existing.total_revenue) - summary.revenue) > 0.005
+      Math.abs(Number(existing.total_revenue) - summary.revenue) > 0.005 ||
+      // Net pay (commission − office use) is tracked for weeks submitted
+      // after it was added; older rows (null) skip this check.
+      (existing.total_net != null && Math.abs(Number(existing.total_net) - summary.net) > 0.005)
     )
   )
 
@@ -255,6 +258,7 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
             office: summary.office,
             net: summary.net,
             total_revenue: summary.revenue,
+            total_net: summary.net,
           }}
           onSubmit={submitWeek}
           resubmit={stale}

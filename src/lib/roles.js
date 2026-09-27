@@ -29,8 +29,9 @@ export const isAdmin = (role) => role === 'payroll_admin'
 export const isOffice = (role) => role === 'payroll_admin' || role === 'office'
 
 /** Tier 2+ — may adjust any completed exam, including its Exam Amount. */
+// ('office' is left out on purpose: RLS doesn't give it intake writes.)
 export const canAdjustCompletion = (role) =>
-  role === 'team_lead' || role === 'payroll_admin' || role === 'office'
+  role === 'team_lead' || role === 'payroll_admin'
 
 /** Roles whose week panel is locked to their own exams. */
 export const isSelfScoped = (role) => role === 'examiner' || role === 'team_lead'

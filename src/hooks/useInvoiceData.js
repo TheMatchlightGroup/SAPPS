@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { computeMonthClose } from '../lib/monthClose'
+import { fetchAll } from '../lib/fetchAll'
+import { normalizeIntake } from '../lib/amounts'
 
 // Loads exams + their financials, plus the `invoices` table so the worklist
 // knows what's already been sent. Amount of Exam = the exam's Exam Amount
@@ -26,19 +28,24 @@ export function useInvoiceData() {
     setLoading(true)
     setError('')
     const [examRes, intakeRes, invRes, weekRes, userRes, poRes, detRes] = await Promise.all([
-      supabase
+      fetchAll(() => supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_type, organization, status, examiner_id')
-        .order('exam_date', { ascending: true }),
-      supabase
+        .order('exam_date', { ascending: true })
+        .order('id')),
+      fetchAll(() => supabase
         .from('intake_forms')
-        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps'),
-      supabase
+        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps')
+        .order('exam_id')),
+      fetchAll(() => supabase
         .from('invoices')
-        .select('id, organization, month, invoice_no, method, sent_at, sent_by'),
-      supabase
+        .select('id, organization, month, invoice_no, method, sent_at, sent_by')
+        .order('id')),
+      fetchAll(() => supabase
         .from('week_submissions')
-        .select('examiner_id, week_start, week_end'),
+        .select('examiner_id, week_start, week_end')
+        .order('week_start')
+        .order('examiner_id')),
       supabase
         .from('users')
         .select('id, name, email, role, active, is_examiner'),
@@ -51,8 +58,10 @@ export function useInvoiceData() {
     ])
     if (examRes.error) setError(examRes.error.message)
 
+    const typeOf = {}
+    for (const e of examRes.data || []) typeOf[e.id] = e.exam_type
     const map = {}
-    for (const r of intakeRes.data || []) map[r.exam_id] = r
+    for (const r of intakeRes.data || []) map[r.exam_id] = normalizeIntake(r, typeOf[r.exam_id])
 
     const sent = {}
     for (const r of invRes.data || []) sent[`${r.organization}__${r.month}`] = r

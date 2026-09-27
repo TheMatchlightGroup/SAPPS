@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { computeMonthClose } from '../lib/monthClose'
-import { examAmountOf, copayOf, billedOf, commissionOf, officeUseOf, examinerNetOf } from '../lib/amounts'
+import { fetchAll } from '../lib/fetchAll'
+import { normalizeIntake, examAmountOf, copayOf, billedOf, commissionOf, officeUseOf, examinerNetOf } from '../lib/amounts'
 
 // --- CSV helpers (no deps; plain Blob download) ---
 function csvEscape(v) {
@@ -41,24 +42,29 @@ export function usePayrollData(month) {
     setLoading(true)
     setError('')
     const [subRes, examRes, intakeRes, userRes] = await Promise.all([
-      supabase
+      fetchAll(() => supabase
         .from('week_submissions')
-        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, submitted_at, submitted_by')
-        .order('submitted_at', { ascending: false }),
-      supabase
+        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, total_net, submitted_at, submitted_by')
+        .order('submitted_at', { ascending: false })
+        .order('id')),
+      fetchAll(() => supabase
         .from('exams')
-        .select('id, client_name, exam_date, exam_time, exam_type, organization, status, examiner_id, duration_minutes'),
-      supabase
+        .select('id, client_name, exam_date, exam_time, exam_type, organization, status, examiner_id, duration_minutes')
+        .order('id')),
+      fetchAll(() => supabase
         .from('intake_forms')
-        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps, submitted_at'),
+        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps, submitted_at')
+        .order('exam_id')),
       supabase
         .from('users')
         .select('id, name, email, role, active, is_examiner'),
     ])
     if (subRes.error) setError(subRes.error.message)
 
+    const typeOf = {}
+    for (const e of examRes.data || []) typeOf[e.id] = e.exam_type
     const intakeMap = {}
-    for (const r of intakeRes.data || []) intakeMap[r.exam_id] = r
+    for (const r of intakeRes.data || []) intakeMap[r.exam_id] = normalizeIntake(r, typeOf[r.exam_id])
     const nameMap = {}
     for (const u of userRes.data || []) nameMap[u.id] = u.name
 
@@ -92,10 +98,11 @@ export function usePayrollData(month) {
   )
 
   function exportSummaryCsv() {
-    const header = ['Examiner', 'Week Start', 'Week End', 'Completed', 'Total Exams', 'Exam Amounts (as submitted)', 'Submitted']
+    const header = ['Examiner', 'Week Start', 'Week End', 'Completed', 'Total Exams', 'Exam Amounts (as submitted)', 'Examiner Net Pay (as submitted)', 'Submitted']
     const rows = monthSubmissions.map((s) => [
       s.examiner_name, s.week_start, s.week_end, s.completed_exams, s.total_exams,
-      money(s.total_revenue), s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '',
+      money(s.total_revenue), s.total_net == null ? '' : money(s.total_net),
+      s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '',
     ])
     downloadCsv(`sapps-${month}-week-summary-${today()}.csv`, [header, ...rows])
   }

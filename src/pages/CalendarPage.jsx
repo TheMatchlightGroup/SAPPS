@@ -93,7 +93,12 @@ export default function CalendarPage() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape' || modal) return
-      if (drawerDate) setDrawerDate(null)
+      if (drawerDate) {
+        // Blur first so a note being typed saves (it saves on blur).
+        const a = document.activeElement
+        if (a && a.closest?.('.day-drawer') && typeof a.blur === 'function') a.blur()
+        setDrawerDate(null)
+      }
       else if (paint) setPaint(false)
     }
     window.addEventListener('keydown', onKey)

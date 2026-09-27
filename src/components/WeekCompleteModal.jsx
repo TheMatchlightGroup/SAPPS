@@ -18,6 +18,7 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
       total_exams: summary.total_exams,
       completed_exams: summary.completed_exams,
       total_revenue: summary.total_revenue,
+      total_net: summary.total_net,
     })
     setBusy(false)
     if (error) setError(error)

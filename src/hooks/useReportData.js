@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { fetchAll } from '../lib/fetchAll'
 
 // ---------------------------------------------------------------
 // Reports data layer.
@@ -23,10 +24,11 @@ export function useReportsLibrary() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const { data, error } = await supabase
+    const { data, error } = await fetchAll(() => supabase
       .from('reports')
       .select(REPORT_COLS)
       .order('exam_date', { ascending: false })
+      .order('id'))
     if (error) setError(error.message)
     setReports(data || [])
     setLoading(false)

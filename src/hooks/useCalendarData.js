@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { withColors } from '../lib/examinerColors'
+import { fetchAll } from '../lib/fetchAll'
+import { normalizeIntake } from '../lib/amounts'
 
 // Central data layer: exams, examiner roster, financials (intake_forms),
 // and week submissions. RLS decides who sees and does what.
@@ -24,11 +26,12 @@ export function useCalendarData() {
   const load = useCallback(async () => {
     setError('')
     const [examRes, examinerRes, intakeRes, weekRes, reportRes, availRes] = await Promise.all([
-      supabase
+      fetchAll(() => supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_time, exam_type, organization, duration_minutes, status, examiner_id')
         .order('exam_date', { ascending: true })
-        .order('exam_time', { ascending: true }),
+        .order('exam_time', { ascending: true })
+        .order('id', { ascending: true })),
       // is_examiner (not role) decides who appears in examiner lists —
       // Cris is payroll_admin AND runs her own exams.
       supabase
@@ -37,24 +40,31 @@ export function useCalendarData() {
         .eq('is_examiner', true)
         .eq('active', true)
         .order('name', { ascending: true }),
-      supabase
+      fetchAll(() => supabase
         .from('intake_forms')
-        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps'),
-      supabase
+        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps')
+        .order('exam_id')),
+      fetchAll(() => supabase
         .from('week_submissions')
-        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, submitted_at')
-        .order('week_start', { ascending: false }),
-      supabase
+        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, total_net, submitted_at')
+        .order('week_start', { ascending: false })
+        .order('id')),
+      fetchAll(() => supabase
         .from('reports')
-        .select('id, exam_id, status'),
-      supabase
+        .select('id, exam_id, status')
+        .order('id')),
+      fetchAll(() => supabase
         .from('examiner_availability')
-        .select('examiner_id, date, note'),
+        .select('examiner_id, date, note')
+        .order('date')
+        .order('examiner_id')),
     ])
     if (examRes.error) setError(examRes.error.message)
 
+    const typeOf = {}
+    for (const e of examRes.data || []) typeOf[e.id] = e.exam_type
     const intakeMap = {}
-    for (const row of intakeRes.data || []) intakeMap[row.exam_id] = row
+    for (const row of intakeRes.data || []) intakeMap[row.exam_id] = normalizeIntake(row, typeOf[row.exam_id])
 
     const reportMap = {}
     for (const row of reportRes.data || []) if (row.exam_id) reportMap[row.exam_id] = row
@@ -85,6 +95,15 @@ export function useCalendarData() {
   // Paint strokes change many days at once, so this takes a batch:
   // `adds` / `removes` are [{ examiner_id, date }]. The calendar updates
   // instantly; the database write follows, and a failure reloads truth.
+  // Writes go through a queue, one after another, so a quick on/off/on can
+  // never land at the database out of order.
+  const writeQueue = useRef(Promise.resolve())
+  const enqueue = useCallback((job) => {
+    const run = writeQueue.current.then(job, job)
+    writeQueue.current = run.catch(() => {})
+    return run
+  }, [])
+
   const changeAvailability = useCallback(async ({ adds = [], removes = [] }) => {
     if (!adds.length && !removes.length) return { error: null }
     setAvailability((m) => {
@@ -95,6 +114,7 @@ export function useCalendarData() {
     })
     const who = user?.email ?? null
     const now = new Date().toISOString()
+    return enqueue(async () => {
     const errors = []
     if (adds.length) {
       const { error } = await supabase.from('examiner_availability').upsert(
@@ -113,7 +133,8 @@ export function useCalendarData() {
     }
     if (errors.length) { await load(); return { error: errors[0] } }
     return { error: null }
-  }, [user, load]) // eslint-disable-line react-hooks/exhaustive-deps
+    })
+  }, [user, load, enqueue]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setAvailabilityNote = useCallback(async (examinerId, date, note) => {
     const clean = (note || '').trim() || null
@@ -121,11 +142,16 @@ export function useCalendarData() {
       const k = `${examinerId}__${date}`
       return m[k] ? { ...m, [k]: { ...m[k], note: clean } } : m
     })
-    const { error } = await supabase.from('examiner_availability')
-      .update({ note: clean, updated_at: new Date().toISOString(), updated_by: user?.email ?? null })
-      .eq('examiner_id', examinerId).eq('date', date)
-    return { error: error?.message || null }
-  }, [user])
+    // Upsert (not update), queued behind any pending toggle, so a note typed
+    // right after marking someone available always lands.
+    return enqueue(async () => {
+      const { error } = await supabase.from('examiner_availability').upsert(
+        { examiner_id: examinerId, date, note: clean, updated_at: new Date().toISOString(), updated_by: user?.email ?? null },
+        { onConflict: 'examiner_id,date' }
+      )
+      return { error: error?.message || null }
+    })
+  }, [user, enqueue])
 
   // Tier 3: change an examiner's calendar color.
   const setExaminerColor = useCallback(async (examinerId, hex) => {
@@ -231,6 +257,7 @@ export function useCalendarData() {
         total_exams: payload.total_exams,
         completed_exams: payload.completed_exams,
         total_revenue: payload.total_revenue,
+        total_net: payload.total_net,
         submitted_at: new Date().toISOString(),
         submitted_by: user?.email ?? null,
       },
