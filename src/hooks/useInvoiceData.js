@@ -3,9 +3,10 @@ import { supabase } from '../lib/supabaseClient'
 import { computeMonthClose } from '../lib/monthClose'
 
 // Loads exams + their financials, plus the `invoices` table so the worklist
-// knows what's already been sent. Amount of Exam = examiner commission +
-// office use (the price the examiner entered); Copay is what the examinee
-// paid; Total Due from the org = Amount - Copay.
+// knows what's already been sent. Amount of Exam = the exam's Exam Amount
+// (lib/amounts.js — legacy rows without one fall back to commission + office
+// use, which is what they billed before); Copay is what the examinee paid;
+// Total Due from the org = Amount − Copay.
 //
 // Also loads examiners + week submissions so the worklist can warn when
 // payroll data for the month isn't fully in yet (exams could still arrive).
@@ -31,7 +32,7 @@ export function useInvoiceData() {
         .order('exam_date', { ascending: true }),
       supabase
         .from('intake_forms')
-        .select('exam_id, copay_amount, amount_due_examiner, amount_due_sapps'),
+        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps'),
       supabase
         .from('invoices')
         .select('id, organization, month, invoice_no, method, sent_at, sent_by'),

@@ -3,6 +3,7 @@ import { format, parseISO } from 'date-fns'
 import { useInvoiceData } from '../hooks/useInvoiceData'
 import { COMPANY, orgCode, orgBillTo, orgEmails } from '../lib/constants'
 import { gmailComposeUrl, mailtoUrl, copyEmailToClipboard } from '../lib/emailLinks'
+import { examAmountOf, copayOf as intakeCopay } from '../lib/amounts'
 import '../styles/invoice.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -30,11 +31,9 @@ export default function InvoicePage() {
     [monthCloseFor, month]
   )
 
-  const amountOf = (e) => {
-    const f = intakeByExam[e.id] || {}
-    return (Number(f.amount_due_examiner) || 0) + (Number(f.amount_due_sapps) || 0)
-  }
-  const copayOf = (e) => Number((intakeByExam[e.id] || {}).copay_amount) || 0
+  // Amount of Exam = Exam Amount; Total Due = Exam Amount − Copay.
+  const amountOf = (e) => examAmountOf(intakeByExam[e.id])
+  const copayOf = (e) => intakeCopay(intakeByExam[e.id])
 
   // Exams completed in the chosen month.
   const monthExams = useMemo(

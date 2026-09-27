@@ -22,7 +22,7 @@ const COLUMNS = [
   { key: 'examiner_name', label: 'Examiner' },
   { key: 'week_start', label: 'Week' },
   { key: 'completed_exams', label: 'Exams' },
-  { key: 'total_revenue', label: 'Revenue', numeric: true },
+  { key: 'total_revenue', label: 'Exam Amounts', numeric: true },
   { key: 'submitted_at', label: 'Submitted' },
 ]
 

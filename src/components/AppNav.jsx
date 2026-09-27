@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ChangePasswordModal from './ChangePasswordModal'
+import { ROLE_LABEL } from '../lib/roles'
 
 export default function AppNav() {
   const { pathname } = useLocation()
@@ -50,7 +51,7 @@ export default function AppNav() {
         {profile && (
           <span className="nav-user">
             <strong>{profile.name}</strong>
-            <span className="role-pill">{role?.replace('_', ' ')}</span>
+            <span className="role-pill">{ROLE_LABEL[role] || role?.replace('_', ' ')}</span>
           </span>
         )}
         <button className="btn btn-ghost nav-pw" onClick={() => setPwOpen(true)} title="Change password">Change password</button>

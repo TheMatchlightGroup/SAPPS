@@ -113,3 +113,23 @@
 .rp-pill.draft { background: rgba(176,138,48,.16); color: #8a6d1f; }
 .rp-pill.final { background: rgba(62,107,79,.14); color: #3e6b4f; }
 .rp-pill.waived { background: rgba(90,90,90,.12); color: var(--ink-700); }
+
+/* ---- Completion money layout (Exam Amount / Copay / Examiner pay) ---- */
+.total-row .neg { color: var(--danger); }
+.total-row.small span:last-child { font-size: 1.05rem; }
+.total-sub { font-size: 0.74rem; color: var(--ink-700); opacity: 0.55; text-align: right; padding: 2px var(--s-1) 0; }
+.fin-divider {
+  display: flex; align-items: center; gap: var(--s-3);
+  margin: var(--s-5) 0 var(--s-2);
+  font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink-700); opacity: 0.7;
+}
+.fin-divider::before, .fin-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.field.readonly input { background: var(--paper); color: var(--ink-700); cursor: default; }
+.field.readonly input:focus { outline: none; box-shadow: none; border-color: var(--line); }
+.lock-tag { margin-left: 6px; font-size: 0.72rem; opacity: 0.55; }
+.lock-note {
+  margin: 0 0 var(--s-3); padding: 8px 11px; border-radius: var(--radius);
+  background: var(--paper); border: 1px solid var(--line);
+  font-size: 0.82rem; color: var(--ink-700);
+}

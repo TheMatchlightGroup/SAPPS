@@ -3,6 +3,8 @@ import { startOfWeek, endOfWeek, addWeeks, subWeeks, format, parseISO } from 'da
 import { useAuth } from '../context/AuthContext'
 import { reportOverdue, reportSatisfied, REPORT_GRACE_BUSINESS_DAYS } from '../lib/reportUtils'
 import { NO_REPORT_TYPES } from '../lib/constants'
+import { sumAmounts } from '../lib/amounts'
+import { isSelfScoped } from '../lib/roles'
 import WeekCompleteModal from './WeekCompleteModal'
 import '../styles/week-summary.css'
 
@@ -16,7 +18,8 @@ const rangeLabel = (startISO) => {
 
 export default function WeekSummaryPanel({ exams, examiners, intakeByExam, reportByExam = {}, weekSubmissions, submitWeek }) {
   const { user, role } = useAuth()
-  const isExaminer = role === 'examiner'
+  // Examiners and team leads see (and submit) only their own week.
+  const isExaminer = isSelfScoped(role)
 
   const [weekCursor, setWeekCursor] = useState(new Date())
   // Examiners are locked to themselves; admin/office pick whose week to view.
@@ -33,20 +36,17 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
     const weekExams = exams.filter(
       (e) => e.examiner_id === examinerId && e.exam_date >= wStartISO && e.exam_date <= wEndISO
     )
-    let copay = 0, commission = 0, office = 0
-    for (const e of weekExams) {
-      const f = intakeByExam[e.id]
-      if (f) {
-        copay += Number(f.copay_amount) || 0
-        commission += Number(f.amount_due_examiner) || 0
-        office += Number(f.amount_due_sapps) || 0
-      }
-    }
+    const t = sumAmounts(weekExams.map((e) => intakeByExam[e.id]))
     const total = weekExams.length
     const completed = weekExams.filter((e) => e.status === 'completed').length
+    // revenue = total Exam Amounts (what SAPPS charged for the week's exams).
+    // It's what week_submissions.total_revenue stores and what the stale
+    // check compares against.
     return {
       weekExams, total, completed,
-      copay, commission, office, revenue: copay + commission + office,
+      examAmount: t.examAmount, copay: t.copay, billed: t.billed,
+      commission: t.commission, office: t.office, net: t.net,
+      revenue: t.examAmount,
     }
   }, [examinerId, exams, intakeByExam, wStartISO, wEndISO])
 
@@ -172,9 +172,10 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
 
       <div className="week-stats">
         <Stat label="Exams Completed" value={summary ? `${summary.completed} of ${summary.total}` : '—'} />
+        <Stat label="Exam Amounts" value={`$${money(summary?.examAmount)}`} />
         <Stat label="Copay Collected" value={`$${money(summary?.copay)}`} />
-        <Stat label={isExaminer ? 'Your Commission' : 'Examiner Commission'} value={`$${money(summary?.commission)}`} />
-        <Stat label="Office Use" value={`$${money(summary?.office)}`} />
+        <Stat label={isExaminer ? 'Your Net Pay' : 'Examiner Net Pay'} value={`$${money(summary?.net)}`}
+          sub={summary ? `$${money(summary.commission)} commission − $${money(summary.office)} office use` : ''} />
       </div>
 
       {/* Report gate notices */}
@@ -247,9 +248,12 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
             examineeNames: summary.weekExams.map((e) => e.client_name),
             total_exams: summary.total,
             completed_exams: summary.completed,
+            examAmount: summary.examAmount,
             copay: summary.copay,
+            billed: summary.billed,
             commission: summary.commission,
             office: summary.office,
+            net: summary.net,
             total_revenue: summary.revenue,
           }}
           onSubmit={submitWeek}
@@ -261,11 +265,12 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
   )
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, sub }) {
   return (
     <div className="stat-card">
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value}</span>
+      {sub && <span className="stat-sub">{sub}</span>}
     </div>
   )
 }

@@ -33,7 +33,7 @@ export function useCalendarData() {
         .order('name', { ascending: true }),
       supabase
         .from('intake_forms')
-        .select('exam_id, copay_amount, amount_due_examiner, amount_due_sapps'),
+        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps'),
       supabase
         .from('week_submissions')
         .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, submitted_at')
@@ -100,15 +100,18 @@ export function useCalendarData() {
     return { error: null }
   }
 
-  async function fetchIntake(examId) {
+  // Stable identity (useCallback) so the completion modal's prefill effect
+  // runs once per exam — not on every calendar re-render, which used to
+  // wipe amounts mid-entry (e.g. after a background token refresh).
+  const fetchIntake = useCallback(async (examId) => {
     const { data, error } = await supabase
       .from('intake_forms')
-      .select('copay_amount, amount_due_examiner, amount_due_sapps')
+      .select('exam_amount, copay_amount, amount_due_examiner, amount_due_sapps')
       .eq('exam_id', examId)
       .maybeSingle()
     if (error) return { data: null, error: error.message }
     return { data, error: null }
-  }
+  }, [])
 
   async function completeExam(exam, financials) {
     const { error: intakeErr } = await supabase
@@ -117,6 +120,7 @@ export function useCalendarData() {
         {
           exam_id: exam.id,
           examiner_id: exam.examiner_id ?? null,
+          exam_amount: Number(financials.exam_amount) || 0,
           copay_amount: Number(financials.copay_amount) || 0,
           amount_due_examiner: Number(financials.amount_due_examiner) || 0,
           amount_due_sapps: Number(financials.amount_due_sapps) || 0,

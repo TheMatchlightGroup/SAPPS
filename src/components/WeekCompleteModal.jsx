@@ -43,10 +43,12 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
 
           <div className="week-totals">
             <div><span>Exams</span><span>{summary.completed_exams} of {summary.total_exams} completed</span></div>
-            <div><span>Copay collected</span><span>${money(summary.copay)}</span></div>
+            <div><span>Exam amounts</span><span>${money(summary.examAmount)}</span></div>
+            <div><span>Copay collected</span><span>− ${money(summary.copay)}</span></div>
+            <div className="week-totals-grand"><span>Billed to clients</span><span>${money(summary.billed)}</span></div>
             <div><span>Examiner commission</span><span>${money(summary.commission)}</span></div>
-            <div><span>Office use</span><span>${money(summary.office)}</span></div>
-            <div className="week-totals-grand"><span>Total revenue</span><span>${money(summary.total_revenue)}</span></div>
+            <div><span>Office use</span><span>− ${money(summary.office)}</span></div>
+            <div className="week-totals-grand"><span>Examiner net pay</span><span>${money(summary.net)}</span></div>
           </div>
 
           <div className="week-examinees">

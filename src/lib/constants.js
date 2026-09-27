@@ -78,12 +78,13 @@ export const TEST_TYPES = [
 ]
 
 // Billing defaults auto-filled when these types are selected at completion
-// (all fields stay editable). Probation no-shows bill $0.00 — the examiner
-// collects the no-show fee directly. Pre-employment no-shows bill the agency
-// a flat $100 (entered as SAPPS's amount so the invoice line reads $100.00).
+// (all fields stay editable by Tier 2+). Probation no-shows bill $0.00 — the
+// examiner collects the no-show fee directly. Pre-employment no-shows bill
+// the agency a flat $100 Exam Amount. Every other type starts at the $225
+// default Exam Amount (DEFAULT_EXAM_AMOUNT in lib/amounts.js).
 export const TEST_TYPE_BILLING_DEFAULTS = {
-  'Probation No Show': { copay_amount: '0', amount_due_examiner: '0', amount_due_sapps: '0' },
-  'Pre-Employment No Show': { copay_amount: '0', amount_due_examiner: '0', amount_due_sapps: '100' },
+  'Probation No Show': { exam_amount: '0', copay_amount: '0', amount_due_examiner: '0', amount_due_sapps: '0' },
+  'Pre-Employment No Show': { exam_amount: '100', copay_amount: '0', amount_due_examiner: '0', amount_due_sapps: '0' },
 }
 
 // No-shows produce no written report — exempt from the report requirement

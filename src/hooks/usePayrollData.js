@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { computeMonthClose } from '../lib/monthClose'
+import { examAmountOf, copayOf, billedOf, commissionOf, officeUseOf, examinerNetOf } from '../lib/amounts'
 
 // --- CSV helpers (no deps; plain Blob download) ---
 function csvEscape(v) {
@@ -49,7 +50,7 @@ export function usePayrollData(month) {
         .select('id, client_name, exam_date, exam_time, exam_type, organization, status, examiner_id, duration_minutes'),
       supabase
         .from('intake_forms')
-        .select('exam_id, copay_amount, amount_due_examiner, amount_due_sapps, submitted_at'),
+        .select('exam_id, exam_amount, copay_amount, amount_due_examiner, amount_due_sapps, submitted_at'),
       supabase
         .from('users')
         .select('id, name, email, role, active, is_examiner'),
@@ -91,7 +92,7 @@ export function usePayrollData(month) {
   )
 
   function exportSummaryCsv() {
-    const header = ['Examiner', 'Week Start', 'Week End', 'Completed', 'Total Exams', 'Total Revenue', 'Submitted']
+    const header = ['Examiner', 'Week Start', 'Week End', 'Completed', 'Total Exams', 'Exam Amounts (as submitted)', 'Submitted']
     const rows = monthSubmissions.map((s) => [
       s.examiner_name, s.week_start, s.week_end, s.completed_exams, s.total_exams,
       money(s.total_revenue), s.submitted_at ? new Date(s.submitted_at).toLocaleString() : '',
@@ -100,20 +101,20 @@ export function usePayrollData(month) {
   }
 
   function exportDetailedCsv() {
-    const header = ['Date', 'Time', 'Examiner', 'Examinee', 'Exam Type', 'Organization', 'Status', 'Copay', 'Commission', 'Office Use', 'Total', 'Financials Submitted']
+    const header = ['Date', 'Time', 'Examiner', 'Examinee', 'Exam Type', 'Organization', 'Status', 'Exam Amount', 'Copay', 'Billed to Client', 'Commission', 'Office Use', 'Examiner Net Pay', 'Financials Submitted']
     const rows = [...monthExams]
       .sort((a, b) => (a.exam_date + a.exam_time).localeCompare(b.exam_date + b.exam_time))
       .map((e) => {
-        const f = intakeByExam[e.id] || {}
-        const copay = Number(f.copay_amount) || 0
-        const comm = Number(f.amount_due_examiner) || 0
-        const off = Number(f.amount_due_sapps) || 0
+        const f = intakeByExam[e.id]
+        // Exams without financials yet export blank amounts, not $0.00.
+        const cell = (fn) => (f ? money(fn(f)) : '')
         return [
           e.exam_date, (e.exam_time || '').slice(0, 5),
           userName[e.examiner_id] || 'Unassigned',
           e.client_name, e.exam_type, e.organization, e.status,
-          money(copay), money(comm), money(off), money(copay + comm + off),
-          f.submitted_at ? new Date(f.submitted_at).toLocaleString() : '',
+          cell(examAmountOf), cell(copayOf), cell(billedOf),
+          cell(commissionOf), cell(officeUseOf), cell(examinerNetOf),
+          f?.submitted_at ? new Date(f.submitted_at).toLocaleString() : '',
         ]
       })
     downloadCsv(`sapps-${month}-detailed-${today()}.csv`, [header, ...rows])
