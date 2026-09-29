@@ -30,6 +30,7 @@ export const ORGANIZATIONS = {
     'Lynchburg', 'Roanoke', 'Abingdon', 'Roanoke Headquarters', 'Bedford',
     'Martinsville', 'Chesterfield', 'Radford', 'Fairfax', 'Henrico',
     'Manassas', 'Alexandria', 'Rocky Mount', 'Fincastle', 'Tazewell',
+    'Newport News',
   ],
   'Private Clients & Organizations': [
     'Center for Clinical and Forensic Services',
@@ -37,15 +38,17 @@ export const ORGANIZATIONS = {
     'Frank Psychology & Forensics, LLC (Dr. Susan Frank)',
     'Trauma And Hope',
     'Gavin de Becker',
-    'Loudoun Fire & Rescue',
+    'Loudoun County Fire & Rescue',
     "Loudoun County Sheriff's Office",
     'Alexandria Dept. of Emergency Communication',
+    'Alexandria Fire Department',
     'Arlington County Fire & Rescue',
-    'Arlington 911',
+    'Arlington County Department of Public Relations',
     'Arlington Police Department',
     'Prince William County Fire & Rescue',
     'Prince William 911',
     'Prince William Adult Detention Center',
+    'Prince William Office of Criminal Justice Services',
     'Town of Louisa Police Department',
     'Manassas Park Fire & Rescue',
     'Purcellville Police Department',
@@ -54,7 +57,7 @@ export const ORGANIZATIONS = {
     'Fairfax City Police Department',
     'Fairfax City Fire Department',
     "Fairfax County Sheriff's Office",
-    'Fauquier County Fire & Rescue',
+    // One Fauquier entry: Fire & Rescue, Schools, etc. all bill to the county (per Cris, 9/29).
     'Fauquier County Government',
   ],
   'State & Treatment Programs': [
@@ -165,6 +168,7 @@ export const ORG_DIRECTORY = {
     emails: ['m.brown@vadoc.virginia.gov', 'carlie.cutright@vadoc.virginia.gov'],
   },
   Tazewell: { code: 'D43' },
+  'Newport News': { code: 'D19' }, // PROVISIONAL — VADOC P&P District 19 (Newport News); confirm code + billing emails
 
   'Center for Clinical and Forensic Services': {
     code: 'CCFS',
@@ -178,7 +182,7 @@ export const ORG_DIRECTORY = {
     servicing: false,
     emails: ['GDBA_innvoicecapture@concursolutions.com', 'shassanbrown@gdba.com'],
   },
-  'Loudoun Fire & Rescue': {
+  'Loudoun County Fire & Rescue': {
     code: 'LCFR',
     emails: [
       'Timothy.Taheri@loudoun.gov',
@@ -195,12 +199,16 @@ export const ORG_DIRECTORY = {
     code: 'ADEC',
     emails: ['Tiffany.Joy@alexandriava.gov'],
   },
+  'Alexandria Fire Department': {
+    code: 'AFD', // PROVISIONAL — added 9/29 per Cris; confirm code + billing emails
+    billTo: ['City of Alexandria', 'Alexandria Fire Department', '100 North Pitt Street, Suite No. 301', 'Alexandria, VA 22314'],
+  },
   'Arlington County Fire & Rescue': {
     code: 'ACFR', // PROVISIONAL code — not on the contact sheet; confirm against contracts
     emails: ['Mhinds@arlingtonva.us', 'Jhill@arlingtonva.us'],
   },
-  'Arlington 911': {
-    code: 'A911', // PROVISIONAL — added 8/15 per Cris; confirm code + billing emails
+  'Arlington County Department of Public Relations': {
+    code: 'A911', // formerly "Arlington 911" (renamed 9/29 per Cris). PROVISIONAL code; confirm + billing emails
   },
   'Arlington Police Department': {
     code: 'APD', // PROVISIONAL — added 8/15 per Cris; confirm code + billing emails
@@ -214,6 +222,9 @@ export const ORG_DIRECTORY = {
   'Prince William Adult Detention Center': {
     code: 'PWAD',
     emails: ['fcortes@pwcgov.org', 'JMcallister1@pwcgov.org', 'mbarnes2@pwcgov.org'],
+  },
+  'Prince William Office of Criminal Justice Services': {
+    code: 'PWOCJS', // PROVISIONAL — added 9/29 per Cris; confirm code, address + billing emails
   },
   'Town of Louisa Police Department': { code: 'TLPD' },
   'Manassas Park Fire & Rescue': {
@@ -258,19 +269,17 @@ export const ORG_DIRECTORY = {
       'Gabriela.voina@fairfaxcounty.gov',
     ],
   },
-  'Fauquier County Fire & Rescue': {
-    code: 'FCFR',
-    servicing: false,
+  // Fauquier Fire & Rescue merged in 9/29 (all Fauquier exams bill to the county).
+  // Emails combine both old entries — prune to whoever actually receives invoices.
+  'Fauquier County Government': {
+    code: 'FCG',
+    billTo: ['Fauquier County Government', '320 Hospital Drive, Third Floor', 'Warrenton, VA 20186'],
     emails: [
+      'Autumn.Hawley@fauquiercounty.gov',
       'Cathy.Richard@fauquiercounty.gov',
       'natasha.lorenzen@fauquiercounty.gov',
       'Nathan.Helsley@fauquiercounty.gov',
     ],
-  },
-  'Fauquier County Government': {
-    code: 'FCG',
-    servicing: false,
-    emails: ['Autumn.Hawley@fauquiercounty.gov'],
   },
 
   'Sex Offender Treatment Program': {
@@ -293,5 +302,10 @@ export const ORG_DIRECTORY = {
 
 export const orgCode = (name) => ORG_DIRECTORY[name]?.code || 'ORG'
 export const orgBillTo = (name) => ORG_DIRECTORY[name]?.billTo || [name]
+/** Street address lines only (Bill-To minus the name line) — '' when unknown. */
+export const orgAddressLines = (name) => {
+  const b = ORG_DIRECTORY[name]?.billTo
+  return b && b.length > 1 ? b.slice(1) : []
+}
 export const orgEmails = (name) => ORG_DIRECTORY[name]?.emails || []
 export const orgIsServicing = (name) => ORG_DIRECTORY[name]?.servicing !== false

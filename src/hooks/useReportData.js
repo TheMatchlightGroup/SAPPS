@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAll } from '../lib/fetchAll'
 
@@ -39,11 +39,17 @@ export function useReportsLibrary() {
   return { reports, loading, error, refetch: load }
 }
 
-/** Editor page: the exam, the matching template, and the report row (if any). */
+/** Editor page: the exam, its examiner, the matching template, the report
+ *  row (if any), and the agency's remembered address. */
 export function useReportEditor(examId) {
   const [exam, setExam] = useState(null)
+  const [examinerName, setExaminerName] = useState('')
   const [template, setTemplate] = useState(null)
-  const [report, setReport] = useState(null)
+  const [report, setReportState] = useState(null)
+  // Autosave calls saveReport from timers; the ref always holds the latest row.
+  const reportRef = useRef(null)
+  const setReport = (r) => { reportRef.current = r; setReportState(r) }
+  const [orgAddress, setOrgAddress] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -68,6 +74,13 @@ export function useReportEditor(examId) {
     if (!examRes.data) { setError('Exam not found (it may have been deleted).'); setLoading(false); return }
 
     const ex = examRes.data
+    const [userRes, addrRes] = await Promise.all([
+      ex.examiner_id
+        ? supabase.from('users').select('name').eq('id', ex.examiner_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase.from('org_addresses').select('address').eq('organization', ex.organization).maybeSingle(),
+    ])
+
     const templates = tplRes.data || []
     // Best template for this exam's test type; otherwise a generic fallback
     // so a missing template never blocks a report from being written.
@@ -81,6 +94,8 @@ export function useReportEditor(examId) {
       }
 
     setExam(ex)
+    setExaminerName(userRes.data?.name || '')
+    setOrgAddress(addrRes.data?.address || '')
     setTemplate(matched)
     setReport(reportRes.data || null)
     setLoading(false)
@@ -88,13 +103,20 @@ export function useReportEditor(examId) {
 
   useEffect(() => { load() }, [load])
 
-  /** Upsert the report (keyed on exam_id). `patch` carries header/sections/result/status. */
+  /**
+   * Upsert the report (keyed on exam_id). `patch` carries header / sections /
+   * result / status / examiner_name, plus `note`: 'auto' | 'manual' | 'restore'
+   * (the database keeps a copy of the previous text on manual saves and
+   * restores — see report_versions).
+   */
   async function saveReport(patch) {
     const now = new Date().toISOString()
     const { data: u } = await supabase.auth.getUser()
+    const current = reportRef.current
+    const staysFinal = patch.status === 'final' && current?.status === 'final'
     const row = {
       exam_id: exam.id,
-      template_id: template?.id ?? null,
+      template_id: current?.template_id ?? template?.id ?? null,
       examiner_id: exam.examiner_id ?? null,
       examiner_name: patch.examiner_name,
       client_name: exam.client_name,
@@ -108,7 +130,9 @@ export function useReportEditor(examId) {
       waive_reason: patch.status === 'waived' ? (patch.waive_reason || 'Polygraph terminated — no report required') : null,
       updated_at: now,
       updated_by: u?.user?.email ?? null,
-      finalized_at: patch.status === 'final' ? now : null,
+      // Keep the original finalize time when a final report is re-saved.
+      finalized_at: patch.status === 'final' ? (staysFinal ? current.finalized_at : now) : null,
+      save_note: patch.note || 'manual',
     }
     const { data, error } = await supabase
       .from('reports')
@@ -120,7 +144,47 @@ export function useReportEditor(examId) {
     return { error: null, data }
   }
 
-  return { exam, template, report, loading, error, saveReport, refetch: load }
+  /** Remember an agency's address so future reports pre-fill it. */
+  async function saveOrgAddress(address) {
+    const clean = (address || '').trim()
+    if (!exam || !clean || clean === orgAddress.trim()) return
+    const { data: u } = await supabase.auth.getUser()
+    const { error } = await supabase.from('org_addresses').upsert(
+      { organization: exam.organization, address: clean, updated_at: new Date().toISOString(), updated_by: u?.user?.email ?? null },
+      { onConflict: 'organization' }
+    )
+    if (!error) setOrgAddress(clean)
+  }
+
+  /** Earlier versions of this report, newest first. */
+  const loadVersions = useCallback(async () => {
+    if (!report?.id) return { data: [], error: null }
+    const { data, error } = await supabase
+      .from('report_versions')
+      .select('id, status, examiner_name, header, sections, result, saved_by, content_at, snapshot_at, reason')
+      .eq('report_id', report.id)
+      .order('snapshot_at', { ascending: false })
+    return { data: data || [], error: error?.message || null }
+  }, [report?.id])
+
+  /** Other reports to start from (re-tests): matched on the examinee's name. */
+  const findPreviousReports = useCallback(async (q) => {
+    const needle = (q || '').trim()
+    let query = supabase
+      .from('reports')
+      .select(REPORT_COLS)
+      .neq('status', 'waived')
+      .order('exam_date', { ascending: false })
+      .limit(25)
+    if (needle) query = query.ilike('client_name', `%${needle}%`)
+    const { data, error } = await query
+    return { data: (data || []).filter((r) => r.exam_id !== examId), error: error?.message || null }
+  }, [examId])
+
+  return {
+    exam, examinerName, template, report, orgAddress, loading, error,
+    saveReport, saveOrgAddress, loadVersions, findPreviousReports, refetch: load,
+  }
 }
 
 export const DEFAULT_HEADER_FIELDS = [
@@ -137,7 +201,9 @@ export const DEFAULT_HEADER_FIELDS = [
 ]
 
 export const DEFAULT_RESULTS = [
-  'NO SIGNIFICANT REACTIONS / TRUTHFUL',
-  'SIGNIFICANT REACTIONS / UNTRUTHFUL',
+  'NO SIGNIFICANT REACTIONS / NO DECEPTION INDICATED',
+  'SIGNIFICANT REACTIONS / DECEPTION INDICATED',
   'INCONCLUSIVE / NO OPINION',
+  'INCONCLUSIVE / SUSPECTED COUNTERMEASURES',
+  'TERMINATED',
 ]

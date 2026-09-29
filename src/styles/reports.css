@@ -75,7 +75,9 @@
 .rs-company-name { font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; }
 .rs-company-line { font-size: 0.8rem; color: var(--ink-700); }
 
+.report-sheet { --report-red: #B3261E; --report-blue: #1B4A6B; }
 .rs-title {
+  color: var(--report-red);
   text-align: center; font-family: var(--font-display); font-weight: 700;
   letter-spacing: 0.14em; margin: var(--s-5) 0;
   border-top: 2px solid var(--ink-900); border-bottom: 2px solid var(--ink-900);
@@ -102,11 +104,12 @@
 
 .rs-result { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-5); flex-wrap: wrap; }
 .rs-result-label { font-weight: 600; }
-.rs-result-select { max-width: 420px; }
+.rs-result-select { width: 420px; max-width: 100%; min-width: 0; }
 .rs-result-print { display: none; }
 
 .rs-section { margin-bottom: var(--s-4); }
 .rs-section-title {
+  color: var(--report-blue);
   font-size: 0.85rem; font-weight: 700; letter-spacing: 0.04em;
   text-transform: uppercase; margin-bottom: 6px;
   border-bottom: 1px solid var(--line); padding-bottom: 3px;
@@ -145,6 +148,60 @@
   .rs-result-print { display: inline; }
   .rs-section-body { display: none; }
   .rs-section-print { display: block; white-space: pre-wrap; font-size: 10.5pt; line-height: 1.5; }
-  .rs-section { break-inside: avoid-page; }
-  .rs-section-title { break-after: avoid-page; }
+  /* Sections flow across pages (keeping a whole section together is what
+     left big blank gaps). Titles stay with their first lines; no single
+     stranded lines at the top or bottom of a page. */
+  .rs-section { break-inside: auto; }
+  .rs-section-title { break-after: avoid-page; break-inside: avoid; }
+  .rs-section-print { orphans: 3; widows: 3; }
+  .rs-header-grid, .rs-result, .rs-signature { break-inside: avoid; }
+
+  .rs-hf-area { display: none; }
+  .rs-hf-print { display: block; white-space: pre-wrap; font-size: 0.88rem; }
+  .rs-sig-extra input { display: none; }
+  .rs-sig-print { display: inline; }
+  .report-sheet.readonly .rs-section-body { display: none; }
+}
+
+/* ---- Phase 3: ownership, autosave status, address, license/QC, panels ---- */
+.re-owner-note {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px var(--s-3); border-radius: var(--radius); font-size: 0.88rem;
+  background: rgba(27,74,107,.08); border: 1px solid rgba(27,74,107,.3); color: var(--ink-900);
+}
+.re-owner-note.editing { background: rgba(176,138,48,.1); border-color: rgba(176,138,48,.45); }
+.re-owner-note .btn-text { padding: 2px 6px; font-weight: 700; }
+.re-readonly { font-size: 0.8rem; font-weight: 700; color: #1B4A6B; }
+
+.rs-hf.wide { grid-column: 1 / -1; align-items: flex-start; }
+.rs-hf.wide .rs-hf-label { padding-top: 6px; }
+.rs-hf-area { resize: vertical; line-height: 1.4; font-family: inherit; }
+.rs-hf-print { display: none; }
+.report-sheet.readonly .rs-hf-input, .report-sheet.readonly .rs-section-body { background: transparent; cursor: default; }
+.report-sheet.readonly .rs-hf-input:hover { border-bottom-color: var(--line); }
+
+.rs-sig-extra { display: flex; flex-direction: column; gap: 4px; margin-top: var(--s-3); font-size: 0.85rem; }
+.rs-sig-extra label { display: flex; align-items: center; gap: 8px; }
+.rs-sig-extra label > span:first-child { min-width: 84px; color: var(--ink-700); }
+.rs-sig-extra input { border: none; border-bottom: 1px solid var(--line-strong); background: transparent; padding: 2px 4px; font-size: 0.88rem; width: 220px; }
+.rs-sig-print { display: none; }
+
+.re-panel { max-width: 640px; }
+.re-panel .modal-body { gap: var(--s-3); }
+.re-panel input[type=search] { padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--paper); }
+.hv-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; background: var(--paper); }
+.hv-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.hv-row > div { display: flex; flex-direction: column; gap: 2px; }
+.hv-row span { font-size: 0.8rem; color: var(--ink-700); opacity: .8; }
+.hv-row.current { padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); }
+.hv-actions { display: flex; gap: 6px; margin-top: 6px; }
+.hv-actions .btn-text { padding: 2px 6px; font-size: 0.84rem; }
+.hv-preview { margin-top: 8px; font-size: 0.82rem; line-height: 1.45; max-height: 260px; overflow-y: auto; border-top: 1px solid var(--line); padding-top: 8px; }
+.hv-preview p { margin: 0 0 6px; }
+
+/* Print overrides for the Phase 3 fields — must come after their screen rules. */
+@media print {
+  .rs-hf-area, .rs-sig-extra input { display: none !important; }
+  .rs-hf-print { display: block !important; white-space: pre-wrap; font-size: 0.88rem; }
+  .rs-sig-print { display: inline !important; }
 }
