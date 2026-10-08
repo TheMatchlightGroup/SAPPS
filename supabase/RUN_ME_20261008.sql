@@ -91,6 +91,10 @@ begin
         using errcode = '42501';
     end if;
 
+    if new.exam_type is null then
+      raise exception 'Choose a test type.' using errcode = '42501';
+    end if;
+
     if old.exam_type in ('Probation No Show', 'Pre-Employment No Show')
        or new.exam_type in ('Probation No Show', 'Pre-Employment No Show') then
       raise exception 'Switching to or from a No Show changes the billing — ask a team lead or the office.'

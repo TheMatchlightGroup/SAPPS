@@ -262,7 +262,6 @@
   body.printing-schedule .app-main { padding: 0 !important; margin: 0 !important; max-width: none !important; }
   body.printing-schedule, body.printing-schedule .app-shell { background: #fff !important; }
   body.printing-schedule .sched-print { display: block; color: #111; font-size: 10.5pt; }
-  @page { margin: 0.5in; }
 }
 .sp-head {
   display: flex; justify-content: space-between; align-items: flex-start;

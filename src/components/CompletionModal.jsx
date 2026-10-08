@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES } from '../lib/constants'
+import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES, sameReportTemplate } from '../lib/constants'
 import { REPORT_STATUS_LABEL } from '../lib/reportUtils'
 import { DEFAULT_EXAM_AMOUNT, initialExamAmount, normalizeIntake } from '../lib/amounts'
 import { canAdjustCompletion, isOffice } from '../lib/roles'
@@ -210,9 +210,9 @@ export default function CompletionModal({
                 {locked && typeWindow && !typeWindow.open && typeWindow.why && (
                   <span className="field-hint" style={{ color: 'var(--ink-700)', opacity: 0.6 }}>{typeWindow.why}</span>
                 )}
-                {locked && typeWindow?.open && typeChanged && report && report.status !== 'waived' && (
+                {locked && typeWindow?.open && typeChanged && report && report.status !== 'waived' && !sameReportTemplate(exam.exam_type, examType) && (
                   <span className="field-hint" style={{ color: 'var(--ink-700)', opacity: 0.75 }}>
-                    Your report will offer to switch to the {examType} template when you open it — your text carries over.
+                    Your report uses a different template for {examType}. When you open it, it will offer to switch, and sections the two share keep your text.
                   </span>
                 )}
                 {!locked && (

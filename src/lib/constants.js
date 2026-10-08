@@ -95,6 +95,14 @@ export const TEST_TYPE_BILLING_DEFAULTS = {
 export const NO_REPORT_TYPES = ['Probation No Show', 'Pre-Employment No Show']
 export const TEST_TYPE_ABBR = Object.fromEntries(TEST_TYPES.map((t) => [t.value, t.abbr]))
 
+// Test types that share one report template (mirrors report_templates.test_types).
+// Switching within a group keeps the same report sections.
+const TEMPLATE_GROUP = {
+  Maintenance: 'maint', Monitoring: 'maint',
+  'Sexual History': 'sh', 'Sexual History Retest': 'sh',
+}
+export const sameReportTemplate = (a, b) => a === b || (TEMPLATE_GROUP[a] && TEMPLATE_GROUP[a] === TEMPLATE_GROUP[b])
+
 // ---- Org directory: invoice code + (where known) Bill-To + billing emails ----
 // `emails`  = invoice recipients (from the client contact sheet).
 // `servicing: false` = account the sheet marks as not currently active.

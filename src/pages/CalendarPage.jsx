@@ -59,6 +59,7 @@ export default function CalendarPage() {
   })
   const setOnlyId = (v) => {
     setOnlyIdState(v)
+    setFocusId(null) // a spotlight on someone filtered out would dim the whole grid
     try { if (filterKey) (v ? localStorage.setItem(filterKey, v) : localStorage.removeItem(filterKey)) } catch { /* private window */ }
   }
   // A remembered examiner who's no longer on the roster: show everyone.
@@ -77,12 +78,13 @@ export default function CalendarPage() {
     const map = {}
     for (const a of Object.values(availability)) {
       if (!order.has(a.examiner_id)) continue
-      if (only && a.examiner_id !== only.id) continue
+      // Painting shows everyone's dots so the brush examiner is never hidden.
+      if (only && !paint && a.examiner_id !== only.id) continue
       ;(map[a.date] ||= []).push({ examiner: examiners[order.get(a.examiner_id)], note: a.note })
     }
     for (const list of Object.values(map)) list.sort((x, y) => order.get(x.examiner.id) - order.get(y.examiner.id))
     return map
-  }, [availability, examiners, only])
+  }, [availability, examiners, only, paint])
 
   const isAvailable = useCallback((examinerId, date) => availability[`${examinerId}__${date}`] || null, [availability])
 
@@ -136,16 +138,31 @@ export default function CalendarPage() {
   function printSchedule() {
     // Print only the list below (see .sched-print in calendar.css). The
     // browser's print dialog has "Save as PDF".
-    document.body.classList.add('printing-schedule')
-    const done = () => { document.body.classList.remove('printing-schedule'); window.removeEventListener('afterprint', done) }
+    const body = document.body
+    body.classList.add('printing-schedule')
+    // Take the class off when printing ends — 'afterprint' where supported,
+    // the print media query as a backup (some mobile browsers), and a
+    // timeout as a last resort so a later Ctrl+P never prints the list.
+    const mql = window.matchMedia?.('print')
+    let timer
+    const done = () => {
+      body.classList.remove('printing-schedule')
+      window.removeEventListener('afterprint', done)
+      mql?.removeEventListener?.('change', onMql)
+      clearTimeout(timer)
+    }
+    const onMql = (e) => { if (!e.matches) done() }
     window.addEventListener('afterprint', done)
+    mql?.addEventListener?.('change', onMql)
+    timer = setTimeout(done, 60000)
     window.print()
   }
 
   return (
     <div className="cal-page">
       <SchedulePrint
-        exams={shownExams} cursor={cursor} only={only}
+        exams={shownExams} cursor={cursor}
+        only={only || (!showFilter && iAmExaminer ? examiners.find((e) => e.id === user?.id) || null : null)}
         examinerName={examinerName}
       />
       <WeekSummaryPanel
@@ -178,8 +195,8 @@ export default function CalendarPage() {
             </select>
           )}
           <button className="btn btn-text cal-print-btn" onClick={printSchedule}
-            title="Print or save as PDF a day-by-day list of this month">
-            🖨 Print {format(cursor, 'MMMM')}
+            title={`Print or save as PDF a day-by-day list of ${format(cursor, 'MMMM yyyy')}${only ? ` for ${only.name}` : ' for everyone'}`}>
+            🖨 Print {format(cursor, 'MMMM')}{only ? ` · ${only.id === user?.id ? 'mine' : only.name.split(' ')[0]}` : ''}
           </button>
           <div className="view-toggle">
             <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>

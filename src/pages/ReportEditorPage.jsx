@@ -81,17 +81,27 @@ function ReportEditorPage({ examId }) {
   const latest = useRef({})
   latest.current = { header, sections, result, dirty, editable, report, signer }
   const saving = useRef(false)
+  const inFlight = useRef(Promise.resolve())
 
   const doSave = useCallback(async (status, note, extra = {}) => {
+    // An autosave already on its way: another autosave just skips (the
+    // next one will catch up), but a deliberate save — Save, Mark final,
+    // restore, template move/reload — waits for it and then goes, so it's
+    // never silently dropped and the text it replaces lands in History.
+    while (saving.current) {
+      if (note === 'auto') return { error: null, skipped: true }
+      await inFlight.current.catch(() => {})
+    }
     const cur = latest.current
-    if (saving.current) return { error: null, skipped: true }
     saving.current = true
     setBusy(note !== 'auto')
     setSaveErr('')
-    const res = await saveReport({
+    const pending = saveReport({
       header: cur.header, sections: cur.sections, result: cur.result,
       status, examiner_name: cur.signer, note, ...extra,
     })
+    inFlight.current = pending
+    const res = await pending.catch((err) => ({ error: err?.message || 'Save failed' }))
     saving.current = false
     setBusy(false)
     if (res.error) { setSaveErr(res.error); return res }
@@ -181,7 +191,11 @@ function ReportEditorPage({ examId }) {
     setSections(s || [])
     setResult(r || '')
     setPanel(null)
-    latest.current = { ...latest.current, header: h || {}, sections: s || [], result: r || '' }
+    // Marked unsaved until the save lands: if it fails, autosave retries and
+    // the browser warns before closing — the new text is never left looking
+    // saved when it isn't.
+    setDirty(true)
+    latest.current = { ...latest.current, header: h || {}, sections: s || [], result: r || '', dirty: true }
     const { error: e } = await doSave(report?.status === 'final' ? 'final' : 'draft', note, extra)
     if (!e) showFlash(message || (note === 'restore' ? 'Earlier version restored ✓' : 'Copied in ✓'))
   }
@@ -197,9 +211,15 @@ function ReportEditorPage({ examId }) {
   const tplTitles = (template?.sections || []).map((s) => s.title)
   const curTitles = sections.map((s) => s.title)
   const titlesMatch = tplTitles.length === curTitles.length && tplTitles.every((t, i) => t === curTitles[i])
-  const typeChanged = Boolean(report?.template_id && template?.id && report.template_id !== template.id)
-  const oldTemplateName = typeChanged ? (templates.find((t) => t.id === report.template_id)?.name || 'a different template') : null
-  const drift = Boolean(report && report.status !== 'waived' && template?.id && seeded.current && !titlesMatch)
+  const typeChanged = Boolean(report && template?.id && report.template_id !== template.id)
+  const oldTemplateName = typeChanged
+    ? (report.template_id ? (templates.find((t) => t.id === report.template_id)?.name || 'a different template') : 'a general report')
+    : null
+  // Drafts only: a final report has already gone out and must stay exactly
+  // as sent (and a waived one has no text to move).
+  const isDraft = report?.status === 'draft'
+  const drift = Boolean(isDraft && template?.id && seeded.current && !titlesMatch)
+  const canReload = Boolean(template?.id && (!report || isDraft))
 
   function headerFor(tpl) {
     // Keep everything already typed; fill any new header field from the exam.
@@ -217,7 +237,7 @@ function ReportEditorPage({ examId }) {
     const msg = [
       `Move this report to the ${template.name} template?`,
       '',
-      'Sections both templates share keep what you\u2019ve typed.',
+      'Sections both templates share keep their current text as-is (including any older wording or question list) — check those after the move.',
       added.length ? `New sections added: ${added.join(', ')}.` : '',
       dropped.length ? `Sections removed (not in this template): ${dropped.join(', ')}.` : '',
       '',
@@ -298,7 +318,7 @@ function ReportEditorPage({ examId }) {
       )}
 
       {drift && (
-        <div className="re-drift report-controls">
+        <div className="re-drift report-controls" role="status">
           <div>
             {typeChanged ? (
               <><strong>This exam is now listed as {exam.exam_type}</strong>, but this report was started on the {oldTemplateName}.</>
@@ -330,7 +350,7 @@ function ReportEditorPage({ examId }) {
             <button className="btn btn-text" onClick={() => setPanel('copy')} disabled={busy}>Copy from a previous report…</button>
           )}
           {report && <button className="btn btn-text" onClick={() => setPanel('history')}>History</button>}
-          {!readOnly && template?.id && (
+          {!readOnly && canReload && (
             <button className="btn btn-text" onClick={reloadFromTemplate} disabled={busy}
               title="Start the sections over from the template (current text is kept in History)">
               ↺ Reload from template
