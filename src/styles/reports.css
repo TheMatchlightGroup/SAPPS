@@ -205,3 +205,12 @@
   .rs-hf-print { display: block !important; white-space: pre-wrap; font-size: 0.88rem; }
   .rs-sig-print { display: inline !important; }
 }
+
+/* ---- Template drift (10/8): test type changed or template corrected ---- */
+.re-drift {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;
+  padding: 10px var(--s-3); border-radius: var(--radius); font-size: 0.88rem;
+  background: rgba(179,38,30,.06); border: 1px solid rgba(179,38,30,.35); color: var(--ink-900);
+}
+.re-drift > div { flex: 1 1 320px; }
+.re-drift .btn { white-space: nowrap; }

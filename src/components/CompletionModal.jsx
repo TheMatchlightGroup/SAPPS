@@ -32,6 +32,7 @@ export default function CompletionModal({
   exam, examinerName, fetchIntake, onComplete, onDelete, onClose,
   canDelete = false, canEditBooking = false, onEditBooking,
   report = null, onWaiveReport, onUnwaiveReport,
+  weekSubmitted = false, onChangeType,
 }) {
   const navigate = useNavigate()
   const { user, role } = useAuth()
@@ -39,12 +40,27 @@ export default function CompletionModal({
   // Tier 1 gets one pass at the form; once completed, it's theirs to view only.
   const locked = !canAdjust && exam.status === 'completed'
   const canEditExamAmount = canAdjust
+  // …except the TEST TYPE (10/8): examiners switch types mid-exam
+  // (Maintenance ↔ Monitoring, Sexual History ↔ Instant Offense), so they
+  // can still correct it on their own exam until it's committed — the week
+  // goes to payroll or the report is marked final. No Shows change the
+  // billing, so those switches stay with a team lead / the office.
+  // The database enforces the same rule (guard_exam_updates).
+  const isNoShow = (t) => t in TEST_TYPE_BILLING_DEFAULTS
+  const typeWindow = !locked ? null
+    : isNoShow(exam.exam_type) ? { open: false, why: 'No Show types change the billing — ask a team lead or the office to change it.' }
+      : weekSubmitted ? { open: false, why: 'This week was already submitted to payroll — ask a team lead or the office to change the test type.' }
+        : report?.status === 'final' ? { open: false, why: 'The report is marked final — ask a team lead or the office to change the test type.' }
+          : !(user?.id && exam.examiner_id === user.id) ? { open: false, why: '' }
+            : { open: true, why: '' }
+  const typeEditable = !locked || Boolean(typeWindow?.open)
   // Reports stay with the exam's own examiner (or the office) — a team lead
   // adjusting someone else's amounts shouldn't end up signing their report.
   const canWriteReport = isOffice(role) || (user?.id && exam.examiner_id === user.id)
 
   const [fin, setFin] = useState({ exam_amount: '', copay_amount: '', amount_due_examiner: '', amount_due_sapps: '' })
   const [examType, setExamType] = useState(exam.exam_type || '')
+  const typeChanged = examType !== (exam.exam_type || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -116,6 +132,16 @@ export default function CompletionModal({
     else onClose()
   }
 
+  async function handleTypeOnly() {
+    setError('')
+    if (!examType) return setError('Select the test type.')
+    setBusy(true)
+    const { error } = await onChangeType(exam.id, examType)
+    setBusy(false)
+    if (error) setError(error)
+    else onClose()
+  }
+
   async function handleDelete() {
     setBusy(true)
     const { error } = await onDelete(exam.id)
@@ -163,7 +189,9 @@ export default function CompletionModal({
             <>
               {locked && (
                 <p className="lock-note">
-                  This exam is completed. To change anything below, ask a team lead or the office.
+                  {typeWindow?.open
+                    ? 'This exam is completed. You can still change the test type until the week is submitted or the report is marked final. To change the amounts, ask a team lead or the office.'
+                    : 'This exam is completed. To change anything below, ask a team lead or the office.'}
                 </p>
               )}
 
@@ -171,14 +199,22 @@ export default function CompletionModal({
                 <label>Test type</label>
                 <select
                   value={examType}
-                  onChange={(e) => changeType(e.target.value)}
-                  disabled={locked}
+                  onChange={(e) => (locked ? setExamType(e.target.value) : changeType(e.target.value))}
+                  disabled={!typeEditable}
                 >
                   <option value="" disabled>Select…</option>
-                  {TEST_TYPES.map((t) => (
+                  {TEST_TYPES.filter((t) => !locked || !isNoShow(t.value) || t.value === exam.exam_type).map((t) => (
                     <option key={t.value} value={t.value}>{t.value} ({t.abbr})</option>
                   ))}
                 </select>
+                {locked && typeWindow && !typeWindow.open && typeWindow.why && (
+                  <span className="field-hint" style={{ color: 'var(--ink-700)', opacity: 0.6 }}>{typeWindow.why}</span>
+                )}
+                {locked && typeWindow?.open && typeChanged && report && report.status !== 'waived' && (
+                  <span className="field-hint" style={{ color: 'var(--ink-700)', opacity: 0.75 }}>
+                    Your report will offer to switch to the {examType} template when you open it — your text carries over.
+                  </span>
+                )}
                 {!locked && (
                   <span className="field-hint" style={{ color: 'var(--ink-700)', opacity: 0.6 }}>
                     Chosen at completion — the PO usually decides this right before the exam.
@@ -292,7 +328,14 @@ export default function CompletionModal({
                 <button className="btn btn-danger-text" onClick={() => setConfirmDelete(true)} disabled={busy}>Delete</button>
               ) : <span />}
               <div className="foot-right">
-                {locked ? (
+                {locked && typeWindow?.open && typeChanged ? (
+                  <>
+                    <button className="btn btn-text" onClick={onClose} disabled={busy}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleTypeOnly} disabled={busy}>
+                      {busy ? 'Saving…' : 'Save test type'}
+                    </button>
+                  </>
+                ) : locked ? (
                   <button className="btn btn-primary" onClick={onClose}>Close</button>
                 ) : (
                   <>

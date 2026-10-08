@@ -241,3 +241,57 @@
   .avail-dots { justify-content: flex-start; padding-top: 0; }
   .chip-more { font-size: 0.66rem; padding: 0 3px; }
 }
+
+/* ---- Whose schedule + printable month list (10/8) ---- */
+.cal-title { display: flex; flex-direction: column; gap: 6px; }
+.cal-only {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--ink-700);
+}
+.cal-only-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.cal-only .link { font-weight: 700; }
+.cal-controls { flex-wrap: wrap; }
+.cal-show { min-width: 200px; font-weight: 600; }
+.cal-print-btn { white-space: nowrap; }
+
+.sched-print { display: none; }
+
+@media print {
+  body.printing-schedule .app-nav,
+  body.printing-schedule .pw-banner,
+  body.printing-schedule .cal-page > :not(.sched-print) { display: none !important; }
+  body.printing-schedule .app-main { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  body.printing-schedule, body.printing-schedule .app-shell { background: #fff !important; }
+  body.printing-schedule .sched-print { display: block; color: #111; font-size: 10.5pt; }
+  @page { margin: 0.5in; }
+}
+.sp-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 12px;
+}
+.sp-company { font-size: 9pt; letter-spacing: .06em; text-transform: uppercase; color: #555; }
+.sp-title { font-size: 20pt; margin: 2px 0; }
+.sp-month { font-size: 11pt; font-weight: 600; }
+.sp-logo { width: 54px; height: auto; }
+.sp-day { break-inside: avoid; margin-bottom: 10px; }
+.sp-date { font-size: 11pt; margin: 0 0 4px; padding: 3px 6px; background: #eee; border-left: 3px solid #1B4A6B; }
+.sp-table { width: 100%; border-collapse: collapse; }
+.sp-table td { padding: 3px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
+.sp-time { width: 52px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sp-name { font-weight: 600; }
+.sp-len, .sp-status { white-space: nowrap; color: #555; }
+.sp-ex { white-space: nowrap; }
+.sp-empty { font-style: italic; }
+.sp-foot { margin-top: 14px; font-size: 8.5pt; color: #666; border-top: 1px solid #ccc; padding-top: 6px; }
+.sp-table { table-layout: fixed; }
+.sp-table td { overflow-wrap: anywhere; }
+.sp-table .c-time { width: 9%; }
+.sp-time { white-space: nowrap; }
+.sp-table .c-name { width: 20%; }
+.sp-table .c-org { width: 23%; }
+.sp-table .c-type { width: 16%; }
+.sp-table .c-len { width: 9%; }
+.sp-table .c-ex { width: 14%; }
+.sp-table .c-status { width: 9%; }
+.sp-table.one .c-org { width: 30%; }
+.sp-table.one .c-type { width: 20%; }
+.sp-table.one .c-name { width: 25%; }

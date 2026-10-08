@@ -36,7 +36,7 @@ function ReportEditorPage({ examId }) {
   const navigate = useNavigate()
   const { user, profile, role } = useAuth()
   const {
-    exam, examinerName, template, report, orgAddress, loading, error,
+    exam, examinerName, template, templates, report, orgAddress, loading, error,
     saveReport, saveOrgAddress, loadVersions, findPreviousReports,
   } = useReportEditor(examId)
 
@@ -82,7 +82,7 @@ function ReportEditorPage({ examId }) {
   latest.current = { header, sections, result, dirty, editable, report, signer }
   const saving = useRef(false)
 
-  const doSave = useCallback(async (status, note) => {
+  const doSave = useCallback(async (status, note, extra = {}) => {
     const cur = latest.current
     if (saving.current) return { error: null, skipped: true }
     saving.current = true
@@ -90,7 +90,7 @@ function ReportEditorPage({ examId }) {
     setSaveErr('')
     const res = await saveReport({
       header: cur.header, sections: cur.sections, result: cur.result,
-      status, examiner_name: cur.signer, note,
+      status, examiner_name: cur.signer, note, ...extra,
     })
     saving.current = false
     setBusy(false)
@@ -176,14 +176,68 @@ function ReportEditorPage({ examId }) {
 
   // Restore an earlier version or copy another report: load it into the
   // editor as unsaved changes (the current text is kept in History).
-  async function loadContent({ header: h, sections: s, result: r }, note) {
+  async function loadContent({ header: h, sections: s, result: r }, note, { extra = {}, message } = {}) {
     setHeader(h || {})
     setSections(s || [])
     setResult(r || '')
     setPanel(null)
     latest.current = { ...latest.current, header: h || {}, sections: s || [], result: r || '' }
-    const { error: e } = await doSave(report?.status === 'final' ? 'final' : 'draft', note)
-    if (!e) showFlash(note === 'restore' ? 'Earlier version restored ✓' : 'Copied in ✓')
+    const { error: e } = await doSave(report?.status === 'final' ? 'final' : 'draft', note, extra)
+    if (!e) showFlash(message || (note === 'restore' ? 'Earlier version restored ✓' : 'Copied in ✓'))
+  }
+
+  // ---- template drift ----
+  // A report copies its template's sections when it's started. Two things
+  // can leave it on the wrong ones afterward:
+  //   • the exam's test type changed (e.g. Sexual History → Instant Offense)
+  //   • the template itself was corrected after the report was started
+  // Either way the section titles stop matching, and the editor offers to
+  // move the report onto the current template, keeping the text of every
+  // section the two share. The old text is always kept in History.
+  const tplTitles = (template?.sections || []).map((s) => s.title)
+  const curTitles = sections.map((s) => s.title)
+  const titlesMatch = tplTitles.length === curTitles.length && tplTitles.every((t, i) => t === curTitles[i])
+  const typeChanged = Boolean(report?.template_id && template?.id && report.template_id !== template.id)
+  const oldTemplateName = typeChanged ? (templates.find((t) => t.id === report.template_id)?.name || 'a different template') : null
+  const drift = Boolean(report && report.status !== 'waived' && template?.id && seeded.current && !titlesMatch)
+
+  function headerFor(tpl) {
+    // Keep everything already typed; fill any new header field from the exam.
+    const pre = buildPrefillHeader(tpl.header_fields, exam, orgAddress)
+    const h = { ...header }
+    for (const [k, v] of Object.entries(pre)) if (!(h[k] || '').trim()) h[k] = v
+    return h
+  }
+
+  async function moveToTemplate() {
+    const byTitle = new Map(sections.map((s) => [s.title, s]))
+    const next = (template.sections || []).map((s) => (byTitle.has(s.title) ? { ...s, body: byTitle.get(s.title).body } : { ...s }))
+    const dropped = sections.filter((s) => !tplTitles.includes(s.title)).map((s) => s.title)
+    const added = tplTitles.filter((t) => !byTitle.has(t))
+    const msg = [
+      `Move this report to the ${template.name} template?`,
+      '',
+      'Sections both templates share keep what you\u2019ve typed.',
+      added.length ? `New sections added: ${added.join(', ')}.` : '',
+      dropped.length ? `Sections removed (not in this template): ${dropped.join(', ')}.` : '',
+      '',
+      'The current text is saved in History first, so nothing is lost.',
+    ].join('\n').replace(/\n{3,}/g, '\n\n')
+    if (!window.confirm(msg)) return
+    await loadContent({ header: headerFor(template), sections: next, result }, 'manual',
+      { extra: { template_id: template.id }, message: `Now on the ${template.name} template ✓` })
+  }
+
+  async function reloadFromTemplate() {
+    const ok = window.confirm(
+      `Reload this report from the ${template.name} template?\n\n` +
+      'Every section goes back to the template\u2019s original wording and the result is cleared. ' +
+      'The header (name, case #, DOB, officer…) is kept.\n\n' +
+      'The current text is saved in History first — you can restore it from there.'
+    )
+    if (!ok) return
+    await loadContent({ header: headerFor(template), sections: (template.sections || []).map((s) => ({ ...s })), result: '' }, 'manual',
+      { extra: { template_id: template.id }, message: 'Reloaded from the template ✓' })
   }
 
   const examMeta = useMemo(() => {
@@ -243,6 +297,26 @@ function ReportEditorPage({ examId }) {
         </div>
       )}
 
+      {drift && (
+        <div className="re-drift report-controls">
+          <div>
+            {typeChanged ? (
+              <><strong>This exam is now listed as {exam.exam_type}</strong>, but this report was started on the {oldTemplateName}.</>
+            ) : (
+              <><strong>The {template.name} template has been updated</strong> since this report was started.</>
+            )}{' '}
+            {editable
+              ? 'Move it to the current template — sections the two share keep your text.'
+              : 'The examiner can move it to the current template.'}
+          </div>
+          {editable && (
+            <button className="btn btn-primary" onClick={moveToTemplate} disabled={busy}>
+              {typeChanged ? `Switch to ${template.name}` : 'Update to the new template'}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="re-actions report-controls">
         <div className="re-status">
           {status && status !== 'waived' && <span className={`rp-pill ${status}`}>{REPORT_STATUS_LABEL[status]}</span>}
@@ -256,6 +330,12 @@ function ReportEditorPage({ examId }) {
             <button className="btn btn-text" onClick={() => setPanel('copy')} disabled={busy}>Copy from a previous report…</button>
           )}
           {report && <button className="btn btn-text" onClick={() => setPanel('history')}>History</button>}
+          {!readOnly && template?.id && (
+            <button className="btn btn-text" onClick={reloadFromTemplate} disabled={busy}
+              title="Start the sections over from the template (current text is kept in History)">
+              ↺ Reload from template
+            </button>
+          )}
           {!readOnly && (
             <>
               <button className="btn btn-text" onClick={saveDraft} disabled={busy}>

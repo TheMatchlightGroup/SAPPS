@@ -7,6 +7,7 @@ import { useCalendarData } from '../hooks/useCalendarData'
 import { useAuth } from '../context/AuthContext'
 import { TEST_TYPE_ABBR } from '../lib/constants'
 import { isOffice as isOfficeRole, isAdmin } from '../lib/roles'
+import { weekStartOf } from '../lib/monthClose'
 import { tint } from '../lib/examinerColors'
 import BookingModal from '../components/BookingModal'
 import CompletionModal from '../components/CompletionModal'
@@ -22,12 +23,12 @@ export default function CalendarPage() {
   const {
     exams, examiners, examinerName, examinerColor, intakeByExam, reportByExam, weekSubmissions,
     loading, error,
-    createBooking, updateBooking, fetchIntake, completeExam, deleteExam, submitWeek,
+    createBooking, updateBooking, fetchIntake, completeExam, changeExamType, deleteExam, submitWeek,
     waiveReport, unwaiveReport,
     availability, changeAvailability, setAvailabilityNote, setExaminerColor,
   } = useCalendarData()
 
-  const { role } = useAuth()
+  const { user, role } = useAuth()
   // Scheduling + availability are office-only (Tier 3). Examiners and team
   // leads are read-only on the schedule; everyone can open the day drawer.
   const isOffice = isOfficeRole(role)
@@ -43,11 +44,32 @@ export default function CalendarPage() {
   const [focusId, setFocusId] = useState(null)
   const [availError, setAvailError] = useState('')
 
+  // ---- Whose schedule (10/8) ----
+  // Everyone who can see more than their own exams (office, team lead) can
+  // narrow the calendar to one examiner — "Just me" for examiners who also
+  // hold a higher role, or any examiner for the office. Everything else
+  // falls away: month grid, day drawer, agenda, and the printed list.
+  // Remembered per person on this device.
+  const seesOthers = useMemo(() => exams.some((e) => e.examiner_id && e.examiner_id !== user?.id), [exams, user])
+  const iAmExaminer = examiners.some((e) => e.id === user?.id)
+  const showFilter = isOffice || role === 'team_lead' || seesOthers
+  const filterKey = user?.id ? `sapps.calShow.${user.id}` : null
+  const [onlyId, setOnlyIdState] = useState(() => {
+    try { return (filterKey && localStorage.getItem(filterKey)) || '' } catch { return '' }
+  })
+  const setOnlyId = (v) => {
+    setOnlyIdState(v)
+    try { if (filterKey) (v ? localStorage.setItem(filterKey, v) : localStorage.removeItem(filterKey)) } catch { /* private window */ }
+  }
+  // A remembered examiner who's no longer on the roster: show everyone.
+  const only = showFilter && onlyId ? examiners.find((e) => e.id === onlyId) || null : null
+  const shownExams = useMemo(() => (only ? exams.filter((e) => e.examiner_id === only.id) : exams), [exams, only])
+
   const examsByDate = useMemo(() => {
     const map = {}
-    for (const ex of exams) (map[ex.exam_date] ||= []).push(ex)
+    for (const ex of shownExams) (map[ex.exam_date] ||= []).push(ex)
     return map
-  }, [exams])
+  }, [shownExams])
 
   // date -> [{ examiner, note }] in roster order (active examiners only).
   const availableByDate = useMemo(() => {
@@ -55,11 +77,12 @@ export default function CalendarPage() {
     const map = {}
     for (const a of Object.values(availability)) {
       if (!order.has(a.examiner_id)) continue
+      if (only && a.examiner_id !== only.id) continue
       ;(map[a.date] ||= []).push({ examiner: examiners[order.get(a.examiner_id)], note: a.note })
     }
     for (const list of Object.values(map)) list.sort((x, y) => order.get(x.examiner.id) - order.get(y.examiner.id))
     return map
-  }, [availability, examiners])
+  }, [availability, examiners, only])
 
   const isAvailable = useCallback((examinerId, date) => availability[`${examinerId}__${date}`] || null, [availability])
 
@@ -110,8 +133,21 @@ export default function CalendarPage() {
     [drawerDate, examsByDate]
   )
 
+  function printSchedule() {
+    // Print only the list below (see .sched-print in calendar.css). The
+    // browser's print dialog has "Save as PDF".
+    document.body.classList.add('printing-schedule')
+    const done = () => { document.body.classList.remove('printing-schedule'); window.removeEventListener('afterprint', done) }
+    window.addEventListener('afterprint', done)
+    window.print()
+  }
+
   return (
-    <div>
+    <div className="cal-page">
+      <SchedulePrint
+        exams={shownExams} cursor={cursor} only={only}
+        examinerName={examinerName}
+      />
       <WeekSummaryPanel
         exams={exams}
         examiners={examiners}
@@ -122,8 +158,29 @@ export default function CalendarPage() {
       />
 
       <div className="cal-toolbar">
-        <div className="cal-title"><h2>Polygraph Calendar</h2></div>
+        <div className="cal-title">
+          <h2>Polygraph Calendar</h2>
+          {only && (
+            <div className="cal-only">
+              <span className="cal-only-dot" style={{ '--c': only.color || 'var(--ink-500)' }} aria-hidden="true" />
+              Showing only <strong>{only.id === user?.id ? 'your exams' : only.name}</strong>
+              <button className="link" onClick={() => setOnlyId('')}>Show everyone</button>
+            </div>
+          )}
+        </div>
         <div className="cal-controls">
+          {showFilter && examiners.length > 0 && (
+            <select className="week-examiner cal-show" value={only ? only.id : ''} onChange={(e) => setOnlyId(e.target.value)}
+              aria-label="Whose schedule to show">
+              <option value="">Everyone's schedule</option>
+              {iAmExaminer && <option value={user.id}>Just me</option>}
+              {examiners.filter((e) => e.id !== user?.id).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          )}
+          <button className="btn btn-text cal-print-btn" onClick={printSchedule}
+            title="Print or save as PDF a day-by-day list of this month">
+            🖨 Print {format(cursor, 'MMMM')}
+          </button>
           <div className="view-toggle">
             <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
             <button className={view === 'agenda' ? 'on' : ''} onClick={() => { setView('agenda'); setPaint(false) }}>Agenda</button>
@@ -169,8 +226,8 @@ export default function CalendarPage() {
         </>
       ) : (
         <AgendaView
-          exams={exams} examinerName={examinerName} examinerColor={examinerColor}
-          canBook={canBook}
+          exams={shownExams} examinerName={examinerName} examinerColor={examinerColor}
+          canBook={canBook} filtered={Boolean(only)}
           onNew={() => openNew()} onExamClick={openComplete}
         />
       )}
@@ -231,6 +288,8 @@ export default function CalendarPage() {
           report={reportByExam[modal.exam.id] || null}
           onWaiveReport={waiveReport}
           onUnwaiveReport={unwaiveReport}
+          weekSubmitted={weekSubmissions.some((w) => w.examiner_id === modal.exam.examiner_id && w.week_start === weekStartOf(modal.exam.exam_date))}
+          onChangeType={changeExamType}
         />
       )}
     </div>
@@ -389,11 +448,13 @@ function MonthView({
   )
 }
 
-function AgendaView({ exams, examinerName, examinerColor, canBook, onNew, onExamClick }) {
+function AgendaView({ exams, examinerName, examinerColor, canBook, filtered = false, onNew, onExamClick }) {
   if (exams.length === 0) {
     return (
       <div className="cal-empty">
-        {canBook ? (
+        {filtered ? (
+          <>No exams for this examiner.</>
+        ) : canBook ? (
           <>No bookings yet. <button className="link" onClick={onNew}>Create the first one →</button></>
         ) : (
           <>No exams assigned to you yet.</>
@@ -425,5 +486,61 @@ function AgendaView({ exams, examinerName, examinerColor, canBook, onNew, onExam
         </div>
       ))}
     </div>
+  )
+}
+
+// Print-only: a day-by-day list of one month — everyone, or the one
+// examiner the calendar is narrowed to. Hidden on screen; "Print <Month>"
+// shows only this (see .sched-print in calendar.css).
+function SchedulePrint({ exams, cursor, only, examinerName }) {
+  const ym = format(cursor, 'yyyy-MM')
+  const days = useMemo(() => {
+    const map = {}
+    for (const ex of exams) if (ex.exam_date?.slice(0, 7) === ym) (map[ex.exam_date] ||= []).push(ex)
+    return Object.keys(map).sort().map((d) => ({
+      date: d,
+      rows: map[d].sort((a, b) => (a.exam_time || '').localeCompare(b.exam_time || '')),
+    }))
+  }, [exams, ym])
+  const total = days.reduce((n, d) => n + d.rows.length, 0)
+  const who = only ? only.name : 'All examiners'
+  return (
+    <section className="sched-print" aria-hidden="true">
+      <header className="sp-head">
+        <div>
+          <div className="sp-company">Smith &amp; Associates · Polygraph Schedule</div>
+          <h1 className="sp-title">{who}</h1>
+          <div className="sp-month">{format(cursor, 'MMMM yyyy')} · {total} {total === 1 ? 'exam' : 'exams'}</div>
+        </div>
+        <img className="sp-logo" src="/SAPPS_logo.svg" alt="" />
+      </header>
+      {days.length === 0 ? (
+        <p className="sp-empty">No exams scheduled this month.</p>
+      ) : days.map(({ date, rows }) => (
+        <div key={date} className="sp-day">
+          <h2 className="sp-date">{format(parseISO(date), 'EEEE, MMMM d')}</h2>
+          <table className={`sp-table${only ? ' one' : ''}`}>
+            <colgroup>
+              <col className="c-time" /><col className="c-name" /><col className="c-org" /><col className="c-type" />
+              <col className="c-len" />{!only && <col className="c-ex" />}<col className="c-status" />
+            </colgroup>
+            <tbody>
+              {rows.map((ex) => (
+                <tr key={ex.id}>
+                  <td className="sp-time">{ex.exam_time?.slice(0, 5) || '—'}</td>
+                  <td className="sp-name">{ex.client_name}</td>
+                  <td>{ex.organization}</td>
+                  <td>{ex.exam_type || 'Type TBD'}</td>
+                  <td className="sp-len">{ex.duration_minutes ? `${ex.duration_minutes} min` : ''}</td>
+                  {!only && <td className="sp-ex">{examinerName(ex.examiner_id)}</td>}
+                  <td className="sp-status">{ex.status === 'completed' ? '✓ Done' : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      <footer className="sp-foot">Printed {format(new Date(), 'MMM d, yyyy · h:mm a')} · Schedules change — check the app for the latest.</footer>
+    </section>
   )
 }

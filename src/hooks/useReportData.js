@@ -45,6 +45,7 @@ export function useReportEditor(examId) {
   const [exam, setExam] = useState(null)
   const [examinerName, setExaminerName] = useState('')
   const [template, setTemplate] = useState(null)
+  const [templates, setTemplates] = useState([])
   const [report, setReportState] = useState(null)
   // Autosave calls saveReport from timers; the ref always holds the latest row.
   const reportRef = useRef(null)
@@ -97,6 +98,7 @@ export function useReportEditor(examId) {
     setExaminerName(userRes.data?.name || '')
     setOrgAddress(addrRes.data?.address || '')
     setTemplate(matched)
+    setTemplates(templates)
     setReport(reportRes.data || null)
     setLoading(false)
   }, [examId])
@@ -116,7 +118,8 @@ export function useReportEditor(examId) {
     const staysFinal = patch.status === 'final' && current?.status === 'final'
     const row = {
       exam_id: exam.id,
-      template_id: current?.template_id ?? template?.id ?? null,
+      // A template switch / reload passes the new template_id explicitly.
+      template_id: patch.template_id !== undefined ? patch.template_id : (current?.template_id ?? template?.id ?? null),
       examiner_id: exam.examiner_id ?? null,
       examiner_name: patch.examiner_name,
       client_name: exam.client_name,
@@ -182,7 +185,7 @@ export function useReportEditor(examId) {
   }, [examId])
 
   return {
-    exam, examinerName, template, report, orgAddress, loading, error,
+    exam, examinerName, template, templates, report, orgAddress, loading, error,
     saveReport, saveOrgAddress, loadVersions, findPreviousReports, refetch: load,
   }
 }

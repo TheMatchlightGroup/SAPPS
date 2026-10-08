@@ -237,6 +237,15 @@ export function useCalendarData() {
     return { error: null }
   }
 
+  // Tier 1 test-type correction on a completed exam (see CompletionModal and
+  // guard_exam_updates). Only exam_type is written; amounts are untouched.
+  async function changeExamType(examId, examType) {
+    const { error } = await supabase.from('exams').update({ exam_type: examType }).eq('id', examId)
+    if (error) return { error: error.message }
+    await load()
+    return { error: null }
+  }
+
   async function deleteExam(examId) {
     const { error } = await supabase.from('exams').delete().eq('id', examId)
     if (error) return { error: error.message }
@@ -306,7 +315,7 @@ export function useCalendarData() {
     exams, examiners, examinerName, examinerColor, intakeByExam, reportByExam, weekSubmissions,
     availability, changeAvailability, setAvailabilityNote, setExaminerColor,
     loading, error, refetch: load,
-    createBooking, updateBooking, fetchIntake, completeExam, deleteExam, submitWeek,
+    createBooking, updateBooking, fetchIntake, completeExam, changeExamType, deleteExam, submitWeek,
     waiveReport, unwaiveReport,
   }
 }
