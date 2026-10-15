@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import {
   PRIVATE_LENGTHS, DEFAULT_PRIVATE_MINUTES, timeRange, scheduleConflicts,
-  canEditBlock, blockLockedReason,
+  canEditBlock, blockLockedReason, hasStarted,
 } from '../lib/privateBlocks'
 import '../styles/modal.css'
 
@@ -65,8 +65,8 @@ export default function PrivateBlockModal({
   const rate = examiner?.private_office_fee
   const fee = !form.at_office ? 0
     : isOffice && feeTouched ? Number(feeOverride) || 0
-    : editing && block.at_office ? Number(block.office_fee) || 0
-      : Number(rate) || 0
+    : editing && block.at_office && block.examiner_id === form.examiner_id ? block.office_fee
+      : rate
 
   const lengths = PRIVATE_LENGTHS.some((l) => l.value === Number(form.duration_minutes))
     ? PRIVATE_LENGTHS
@@ -81,8 +81,8 @@ export default function PrivateBlockModal({
     setError('')
     if (!form.examiner_id) return setError('Choose whose private exam this is.')
     if (!form.block_date || !form.start_time) return setError('Date and start time are required.')
-    if (!isOffice && editing && form.block_date < todayISO()) {
-      return setError('A private exam can’t be moved into the past. Ask the office.')
+    if (!isOffice && editing && hasStarted(form.block_date, form.start_time)) {
+      return setError('A private exam can’t be moved to a time that has already passed. Ask the office.')
     }
     let payload = form
     if (isOffice) {
@@ -90,7 +90,9 @@ export default function PrivateBlockModal({
       else if (feeTouched) {
         if (feeOverride !== '' && (Number.isNaN(Number(feeOverride)) || Number(feeOverride) < 0)) return setError('Office fee must be $0 or more.')
         payload = { ...form, office_fee: feeOverride === '' ? null : feeOverride }
-      } else if (editing && !block.at_office) payload = { ...form, office_fee: null } // newly at the office → rate
+      } else if (editing && (!block.at_office || block.examiner_id !== form.examiner_id)) {
+        payload = { ...form, office_fee: null } // newly at the office, or a different examiner → their rate
+      }
     }
     setBusy(true)
     const { error: e } = await onSave(payload, block?.id || null)
@@ -167,11 +169,9 @@ export default function PrivateBlockModal({
               <span>
                 {!form.at_office
                   ? 'Not using the office — this only holds the time on the calendar.'
-                  : fee > 0
-                    ? `Office fee $${money(fee)} — deducted from ${isSelf ? 'your' : `${first}’s`} pay by payroll.`
-                    : rate == null && !editing
-                      ? `No office fee is on file for ${isSelf ? 'you' : first || 'this examiner'} yet — the office will set it.`
-                      : 'Office fee $0.00.'}
+                  : fee == null
+                    ? `No office fee is on file for ${isSelf ? 'you' : first || 'this examiner'} yet — the office will set it, and it’s deducted from pay.`
+                    : `Office fee $${money(fee)} — deducted from ${isSelf ? 'your' : `${first}’s`} pay by payroll.`}
               </span>
             </span>
           </label>

@@ -155,9 +155,9 @@ export default function BookingModal({
                   pool.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)
                 )}
               </select>
-              {allowedSet && (
+              {allowedSet && allowedNames.length > 0 && (
                 <span className="field-hint">
-                  Only {allowedNames.length > 1 ? `${allowedNames.slice(0, -1).join(', ')} and ${allowedNames.at(-1)}` : allowedNames[0]} take {form.organization} exams.
+                  Only {allowedNames.length > 1 ? `${allowedNames.slice(0, -1).join(', ')} and ${allowedNames[allowedNames.length - 1]}` : allowedNames[0]} take {form.organization} exams.
                 </span>
               )}
               {notForOrg && (

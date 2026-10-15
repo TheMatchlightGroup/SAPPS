@@ -174,3 +174,12 @@ button.pr-remind-choice, .pr-remind-cancel { font-family: inherit; }
 .pr-remind:disabled { opacity: 0.6; cursor: default; }
 .pr-private-list li.upcoming { color: var(--ink-700); }
 .pr-upcoming { font-size: 0.8rem; opacity: 0.65; margin-left: 4px; }
+.pr-flags { border-radius: var(--radius); padding: 8px 10px; background: rgba(155,59,46,.06); border: 1px solid rgba(155,59,46,.25); }
+.pr-flags-label { font-size: 0.85rem; font-weight: 700; color: var(--danger); }
+.pr-flags ul { margin: 4px 0 0; padding-left: 18px; font-size: 0.86rem; color: var(--ink-800); }
+.pr-flags-when { opacity: 0.6; }
+.pr-carried { font-size: 0.8rem; color: var(--danger); margin-left: 4px; }
+.pr-rates { border-top: 1px solid var(--line); padding-top: var(--s-3); }
+.pr-rates summary { cursor: pointer; font-weight: 600; color: var(--ink-800); font-size: 0.95rem; }
+.pr-rates ul { list-style: none; margin: var(--s-3) 0 var(--s-2); padding: 0; display: grid; gap: 6px; max-width: 480px; }
+.pr-rates li { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); font-size: 0.95rem; padding: 4px 0; border-bottom: 1px solid var(--line); }

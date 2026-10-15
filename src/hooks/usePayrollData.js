@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { computeMonthClose } from '../lib/monthClose'
 import { fetchAll } from '../lib/fetchAll'
-import { timeRange } from '../lib/privateBlocks'
+import { timeRange, hasStarted } from '../lib/privateBlocks'
 import { normalizeIntake, examAmountOf, copayOf, billedOf, commissionOf, officeUseOf, examinerNetOf } from '../lib/amounts'
 
 // --- CSV helpers (no deps; plain Blob download) ---
@@ -38,13 +38,14 @@ export function usePayrollData(month) {
   const [examiners, setExaminers] = useState([])
   const [privateBlocks, setPrivateBlocks] = useState([])
   const [users, setUsers] = useState([])
+  const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [subRes, examRes, intakeRes, userRes, privRes] = await Promise.all([
+    const [subRes, examRes, intakeRes, userRes, privRes, histRes] = await Promise.all([
       fetchAll(() => supabase
         .from('week_submissions')
         .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, total_net, submitted_at, submitted_by')
@@ -66,6 +67,12 @@ export function usePayrollData(month) {
         .select('id, examiner_id, block_date, start_time, duration_minutes, at_office, office_fee, note, deducted_at, deducted_by')
         .order('block_date')
         .order('id')),
+      // Edits/removals of private exams (office-only; 20261015b). If that
+      // migration hasn't run yet this just comes back empty.
+      fetchAll(() => supabase
+        .from('private_blocks_history')
+        .select('id, block_id, examiner_id, action, before, after, changed_by, changed_by_email, changed_at')
+        .order('id')),
     ])
     if (subRes.error) setError(subRes.error.message)
 
@@ -83,6 +90,7 @@ export function usePayrollData(month) {
     setExaminers((userRes.data || []).filter((u) => u.is_examiner && u.active))
     setUsers(userRes.data || [])
     setPrivateBlocks(privRes.data || [])
+    setHistory(histRes.error ? [] : (histRes.data || []))
     setLoading(false)
   }, [])
 
@@ -111,26 +119,62 @@ export function usePayrollData(month) {
   // One group per examiner who has a fee on file or logged office use this
   // month. `owed` = not yet marked deducted.
   const monthPrivate = useMemo(() => {
-    const inMonth = privateBlocks.filter((b) => b.at_office && (b.block_date || '').startsWith(month))
+    const monthStart = `${month}-01`
+    const inMonthStr = (d) => (d || '').startsWith(month)
+    // This month's office exams, plus anything from EARLIER months that was
+    // never marked deducted (so an old fee can't slip out of sight).
+    const relevant = privateBlocks.filter((b) => b.at_office && (inMonthStr(b.block_date) || (b.block_date < monthStart && !b.deducted_at)))
+    // Fee-relevant changes an examiner made THEMSELVES to an office exam:
+    // removed it, switched it to "not at the office", or moved it. Shown in
+    // the month it was dated AND the month it was moved to.
+    const selfFlags = history
+      .filter((h) => h.examiner_id && h.changed_by === h.examiner_id && h.before?.at_office)
+      .map((h) => {
+        const a = h.after
+        let kind = null
+        if (h.action === 'delete') kind = 'removed'
+        else if (a && !a.at_office) kind = 'not-office'
+        else if (a && (a.block_date !== h.before.block_date || String(a.start_time).slice(0, 5) !== String(h.before.start_time).slice(0, 5))) kind = 'moved'
+        return kind && {
+          id: h.id, examiner_id: h.examiner_id, kind, at: h.changed_at,
+          date: h.before.block_date, start: h.before.start_time, minutes: h.before.duration_minutes, fee: h.before.office_fee,
+          toDate: a?.block_date, toStart: a?.start_time,
+        }
+      })
+      .filter((f) => f && (inMonthStr(f.date) || (f.kind === 'moved' && inMonthStr(f.toDate))))
+
     const byEx = {}
     for (const u of users) if (u.is_examiner && u.active && u.private_office_fee != null) byEx[u.id] = []
-    for (const b of inMonth) (byEx[b.examiner_id] ||= []).push(b)
+    for (const b of relevant) (byEx[b.examiner_id] ||= []).push(b)
+    for (const f of selfFlags) byEx[f.examiner_id] ||= []
+
     return Object.entries(byEx).map(([id, blocks]) => {
       const u = users.find((x) => x.id === id) || {}
       blocks.sort((a, b) => (a.block_date + a.start_time).localeCompare(b.block_date + b.start_time))
-      // Only exams that have happened are owed; future ones show as upcoming.
-      const owedBlocks = blocks.filter((b) => !b.deducted_at && b.block_date <= today())
+      const open = blocks.filter((b) => !b.deducted_at)
+      // Owed = has started and has a fee. Not started yet = upcoming.
+      // No fee yet (no rate on file when logged) = pending until the
+      // office sets the rate.
+      const owedBlocks = open.filter((b) => hasStarted(b.block_date, b.start_time) && b.office_fee != null)
       return {
         id, name: u.name || 'Unknown', email: u.email || '', rate: u.private_office_fee,
-        blocks,
-        total: blocks.reduce((n, b) => n + (Number(b.office_fee) || 0), 0),
+        flags: selfFlags.filter((f) => f.examiner_id === id),
+        blocks: blocks.map((b) => ({ ...b, carried: b.block_date < monthStart, upcoming: !hasStarted(b.block_date, b.start_time) })),
         owed: owedBlocks.reduce((n, b) => n + (Number(b.office_fee) || 0), 0),
         owedIds: owedBlocks.map((b) => b.id),
+        pending: open.filter((b) => b.office_fee == null).length,
         deductedIds: blocks.filter((b) => b.deducted_at).map((b) => b.id),
-        upcoming: blocks.filter((b) => !b.deducted_at && b.block_date > today()).length,
       }
     }).sort((a, b) => b.owed - a.owed || a.name.localeCompare(b.name))
-  }, [privateBlocks, users, month])
+  }, [privateBlocks, users, history, month])
+
+  // Every active examiner's office fee rate — so the office can set a first
+  // rate for anyone, not just people who already have one.
+  const examinerRates = useMemo(
+    () => users.filter((u) => u.is_examiner && u.active).map((u) => ({ id: u.id, name: u.name, rate: u.private_office_fee }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [users]
+  )
 
   const markDeducted = useCallback(async (ids, on = true) => {
     if (!ids.length) return { error: null }
@@ -148,6 +192,13 @@ export function usePayrollData(month) {
     if (v !== null && (Number.isNaN(v) || v < 0)) return { error: 'Fee must be $0 or more.' }
     const { error: e } = await supabase.from('users').update({ private_office_fee: v }).eq('id', userId)
     if (e) return { error: e.message }
+    // Office exams logged before this examiner had a rate are "fee not set"
+    // (NULL). Fill those in now; ones that already have a fee keep it.
+    if (v !== null) {
+      const { error: e2 } = await supabase.from('private_blocks').update({ office_fee: v })
+        .eq('examiner_id', userId).eq('at_office', true).is('office_fee', null).is('deducted_at', null)
+      if (e2) { await load(); return { error: e2.message } }
+    }
     await load()
     return { error: null }
   }, [load])
@@ -185,12 +236,14 @@ export function usePayrollData(month) {
     const privRows = privateBlocks
       .filter((b) => b.at_office && (b.block_date || '').startsWith(month))
       .sort((a, b) => (a.block_date + a.start_time).localeCompare(b.block_date + b.start_time))
+      // Fee goes in Office Use; Net Pay = Commission (blank/0) − Office Use,
+      // same formula as every other row. Status says whether it's deducted.
       .map((b) => [
         b.block_date, (b.start_time || '').slice(0, 5), nameOf[b.examiner_id] || 'Unknown',
-        'Private exam', 'Private (office use)', timeRange(b.start_time, b.duration_minutes),
-        b.deducted_at ? 'deducted' : 'to deduct',
-        '', '', '', '', money(b.office_fee), money(-(Number(b.office_fee) || 0)),
-        b.deducted_at ? new Date(b.deducted_at).toLocaleString() : '',
+        `Private exam (${timeRange(b.start_time, b.duration_minutes)})`, 'Private — office use', '',
+        b.deducted_at ? 'office fee deducted' : b.office_fee == null ? 'office fee not set' : 'office fee to deduct',
+        '', '', '', '', b.office_fee == null ? '' : money(b.office_fee), b.office_fee == null ? '' : money(-(Number(b.office_fee) || 0)),
+        '',
       ])
     downloadCsv(`sapps-${month}-detailed-${today()}.csv`, [header, ...rows, ...privRows])
   }
@@ -201,6 +254,6 @@ export function usePayrollData(month) {
     loading, error, refetch: load,
     exportSummaryCsv, exportDetailedCsv,
     hasMonthExams: monthExams.length > 0,
-    monthPrivate, markDeducted, setOfficeRate,
+    monthPrivate, markDeducted, setOfficeRate, examinerRates,
   }
 }

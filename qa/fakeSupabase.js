@@ -15,11 +15,16 @@ const tables = {
     { id: 'u-marc', email: 'marcbmitchell@gmail.com', name: 'Marc Mitchell', role: 'examiner', color: '#CF5A83', active: true, is_examiner: true, must_change_password: false, private_office_fee: 100 },
     { id: 'u-rob', email: 'rjsmithpolygraph@gmail.com', name: 'Robert Smith', role: 'payroll_admin', color: '#D0613F', active: true, is_examiner: true, must_change_password: false },
   ],
+  private_blocks_history: [
+    { id: 2, block_id: 'pb3', examiner_id: 'u-marc', action: 'update', before: { block_date: d(-2), start_time: '09:00:00', duration_minutes: 180, at_office: true, office_fee: 100 }, after: { block_date: d(60), start_time: '09:00:00', duration_minutes: 180, at_office: true, office_fee: 100 }, changed_by: 'u-marc', changed_by_email: 'marcbmitchell@gmail.com', changed_at: new Date(Date.now() - 3 * 864e5).toISOString() },
+    { id: 1, block_id: 'pbx', examiner_id: 'u-brad', action: 'delete', before: { block_date: d(-5), start_time: '11:00:00', duration_minutes: 120, at_office: true, office_fee: 75 }, after: null, changed_by: 'u-brad', changed_by_email: 'bdhhwt@gmail.com', changed_at: new Date(Date.now() - 5 * 864e5 + 6 * 36e5).toISOString() },
+  ],
   private_blocks: [
+    { id: 'pb0', examiner_id: 'u-brad', block_date: d(-40), start_time: '09:00:00', duration_minutes: 120, at_office: true, office_fee: 75, note: null, deducted_at: null },
     { id: 'pb1', examiner_id: 'u-brad', block_date: d(-8), start_time: '14:00:00', duration_minutes: 120, at_office: true, office_fee: 75, note: null, deducted_at: null },
     { id: 'pb2', examiner_id: 'u-brad', block_date: d(2), start_time: '10:30:00', duration_minutes: 120, at_office: true, office_fee: 75, note: 'Room B', deducted_at: null },
     { id: 'pb3', examiner_id: 'u-marc', block_date: d(-2), start_time: '09:00:00', duration_minutes: 180, at_office: true, office_fee: 100, note: null, deducted_at: null },
-    { id: 'pb5', examiner_id: 'u-al', block_date: d(-12), start_time: '15:00:00', duration_minutes: 90, at_office: true, office_fee: 60, note: null, deducted_at: null },
+    { id: 'pb5', examiner_id: 'u-al', block_date: d(-12), start_time: '15:00:00', duration_minutes: 90, at_office: true, office_fee: null, note: null, deducted_at: null },
     { id: 'pb4', examiner_id: 'u-marc', block_date: d(1), start_time: '13:00:00', duration_minutes: 60, at_office: false, office_fee: 0, note: null, deducted_at: null },
   ],
   exams: [
@@ -67,6 +72,7 @@ function q(table) {
     neq(k, v) { filters.push((r) => r[k] !== v); return api },
     ilike(k, v) { const n = String(v).replace(/%/g, '').toLowerCase(); filters.push((r) => String(r[k] || '').toLowerCase().includes(n)); return api },
     in(k, vs) { filters.push((r) => vs.includes(r[k])); return api },
+    is(k, v) { filters.push((r) => (r[k] ?? null) === v); return api },
     maybeSingle() { one = 'maybe'; return api }, single() { one = true; return api },
     insert(p) { mode = 'insert'; payload = p; return api },
     upsert(p, opts) { mode = 'upsert'; payload = p; conflict = opts?.onConflict?.split(','); return api },
@@ -103,7 +109,13 @@ function q(table) {
 }
 export const supabase = {
   from: q,
-  rpc: async () => ({ data: null, error: null }),
+  rpc: async (name, args) => {
+    if (name === 'office_private_holds') {
+      return { data: tables.private_blocks.filter((b) => b.at_office && b.block_date >= args.from_date && b.block_date <= args.to_date)
+        .map(({ id, examiner_id, block_date, start_time, duration_minutes }) => ({ id, examiner_id, block_date, start_time, duration_minutes })), error: null }
+    }
+    return { data: null, error: null }
+  },
   auth: {
     getSession: async () => ({ data: { session: { user: who } } }),
     getUser: async () => ({ data: { user: who } }),

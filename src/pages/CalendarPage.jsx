@@ -28,7 +28,7 @@ export default function CalendarPage() {
     createBooking, updateBooking, fetchIntake, completeExam, changeExamType, deleteExam, submitWeek,
     waiveReport, unwaiveReport,
     availability, changeAvailability, setAvailabilityNote, setExaminerColor,
-    privateBlocks, savePrivateBlock, deletePrivateBlock,
+    privateBlocks, officeHolds, savePrivateBlock, deletePrivateBlock,
   } = useCalendarData()
 
   const { user, role } = useAuth()
@@ -333,7 +333,7 @@ export default function CalendarPage() {
           userId={user?.id}
           isOffice={isOffice}
           exams={exams}
-          privateBlocks={privateBlocks}
+          privateBlocks={[...privateBlocks, ...officeHolds]}
           examinerName={examinerName}
           onSave={savePrivateBlock}
           onDelete={deletePrivateBlock}

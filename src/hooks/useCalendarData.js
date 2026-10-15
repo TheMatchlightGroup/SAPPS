@@ -20,6 +20,9 @@ export function useCalendarData() {
   // Private exams (the examiner's own company work). Office sees all;
   // examiners and team leads see only their own (RLS).
   const [privateBlocks, setPrivateBlocks] = useState([])
+  // Other examiners' office-held private exams — WHEN only (date/time/
+  // length/who), so an examiner logging one sees the room is taken.
+  const [officeHolds, setOfficeHolds] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -49,7 +52,7 @@ export function useCalendarData() {
         .order('exam_id')),
       fetchAll(() => supabase
         .from('week_submissions')
-        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, total_net, private_office_count, submitted_at')
+        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, total_net, private_office_count, private_office_total, submitted_at')
         .order('week_start', { ascending: false })
         .order('id')),
       fetchAll(() => supabase
@@ -86,6 +89,14 @@ export function useCalendarData() {
     for (const r of availRes.data || []) avail[`${r.examiner_id}__${r.date}`] = r
     setAvailability(avail)
     setPrivateBlocks(privRes.data || [])
+    {
+      const d0 = new Date(); d0.setDate(d0.getDate() - 30)
+      const d1 = new Date(); d1.setDate(d1.getDate() + 365)
+      const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const own = new Set((privRes.data || []).map((b) => b.id))
+      const { data: holds, error: hErr } = await supabase.rpc('office_private_holds', { from_date: iso(d0), to_date: iso(d1) })
+      setOfficeHolds(hErr ? [] : (holds || []).filter((h) => !own.has(h.id)).map((h) => ({ ...h, at_office: true, hold: true })))
+    }
     setLoading(false)
   }, [])
 
@@ -307,6 +318,7 @@ export function useCalendarData() {
         total_revenue: payload.total_revenue,
         total_net: payload.total_net,
         private_office_count: payload.private_office_count ?? null,
+        private_office_total: payload.private_office_total ?? null,
         submitted_at: new Date().toISOString(),
         submitted_by: user?.email ?? null,
       },
@@ -353,7 +365,7 @@ export function useCalendarData() {
 
   return {
     exams, examiners, examinerName, examinerColor, intakeByExam, reportByExam, weekSubmissions,
-    privateBlocks, savePrivateBlock, deletePrivateBlock,
+    privateBlocks, officeHolds, savePrivateBlock, deletePrivateBlock,
     availability, changeAvailability, setAvailabilityNote, setExaminerColor,
     loading, error, refetch: load,
     createBooking, updateBooking, fetchIntake, completeExam, changeExamType, deleteExam, submitWeek,

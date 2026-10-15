@@ -25,6 +25,7 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
       total_revenue: summary.total_revenue,
       total_net: summary.total_net,
       private_office_count: needsAttest ? pb.length : null,
+      private_office_total: needsAttest ? (Number(summary.privateFees) || 0) : null,
     })
     setBusy(false)
     if (error) setError(error)
@@ -67,7 +68,7 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
                 <ul>
                   {pb.map((b) => (
                     <li key={b.id}>
-                      {format(parseISO(b.block_date), 'EEE, MMM d')} · {timeRange(b.start_time, b.duration_minutes)} — office fee ${money(b.office_fee)}
+                      {format(parseISO(b.block_date), 'EEE, MMM d')} · {timeRange(b.start_time, b.duration_minutes)} — {b.office_fee == null ? 'office fee not set yet' : `office fee $${money(b.office_fee)}`}
                     </li>
                   ))}
                 </ul>
@@ -75,9 +76,13 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
               <label>
                 <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} />
                 <span>
-                  {pb.length === 0
-                    ? 'I did not hold any private exams at the SAPPS office this week.'
-                    : `These are all of the private exams I held at the SAPPS office this week ($${money(summary.privateFees)} in office fees).`}
+                  {summary.onBehalf
+                    ? (pb.length === 0
+                      ? `Confirmed with ${summary.examiner_name}: no private exams at the SAPPS office this week.`
+                      : `Confirmed with ${summary.examiner_name}: these are all of their private exams at the SAPPS office this week.`)
+                    : pb.length === 0
+                      ? 'I did not hold any private exams at the SAPPS office this week.'
+                      : `These are all of the private exams I held at the SAPPS office this week ($${money(summary.privateFees)} in office fees).`}
                 </span>
               </label>
               <div className="pb-attest-hint">

@@ -115,6 +115,7 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
     [privateBlocks, examinerId, wStartISO, wEndISO]
   )
   const privateFees = weekPrivate.reduce((n, b) => n + (Number(b.office_fee) || 0), 0)
+  const privatePending = weekPrivate.filter((b) => b.office_fee == null).length
   const examinerRow = examiners.find((e) => e.id === examinerId)
   const usesOffice = examinerRow?.private_office_fee != null || weekPrivate.length > 0
 
@@ -132,7 +133,8 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
       (existing.total_net != null && Math.abs(Number(existing.total_net) - summary.net) > 0.005) ||
       // Private office exams logged/removed after submitting (rows from
       // before 10/15 have null and skip this).
-      (existing.private_office_count != null && Number(existing.private_office_count) !== weekPrivate.length)
+      (existing.private_office_count != null && Number(existing.private_office_count) !== weekPrivate.length) ||
+      (existing.private_office_total != null && Math.abs(Number(existing.private_office_total) - privateFees) > 0.005)
     )
   )
 
@@ -202,7 +204,7 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
           <strong>Private exams at the SAPPS office this week:</strong>{' '}
           {weekPrivate.length === 0
             ? 'none logged.'
-            : `${weekPrivate.length} · $${money(privateFees)} office ${weekPrivate.length === 1 ? 'fee' : 'fees'}, deducted by payroll.`}
+            : `${weekPrivate.length} · $${money(privateFees)} office ${weekPrivate.length === 1 ? 'fee' : 'fees'}${privatePending ? ` (+${privatePending} not set yet)` : ''}, deducted by payroll.`}
           {' '}Log any you've held with “+ Private Exam” on the calendar before you submit.
         </p>
       )}
@@ -288,6 +290,7 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
             usesOffice,
             privateBlocks: weekPrivate,
             privateFees,
+            onBehalf: examinerId !== user?.id,
           }}
           onSubmit={submitWeek}
           resubmit={stale}

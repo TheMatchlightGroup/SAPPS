@@ -31,14 +31,14 @@ export default function PayrollPage() {
   const [month, setMonth] = useState(thisMonth())
   const {
     monthClose, monthSubmissions, loading, error, exportSummaryCsv, exportDetailedCsv, hasMonthExams,
-    monthPrivate, markDeducted, setOfficeRate,
+    monthPrivate, markDeducted, setOfficeRate, examinerRates,
   } = usePayrollData(month)
   const navigate = useNavigate()
 
   const monthLabel = monthLabelOf(month)
   const monthName = monthLabel.split(' ')[0]
   const { rows, outstanding, allIn, hasWork } = monthClose
-  const hasPrivate = monthPrivate.some((g) => g.blocks.length > 0)
+  const hasPrivate = monthPrivate.some((g) => g.blocks.length > 0 || g.flags.length > 0)
 
   return (
     <div className="payroll-screen">
@@ -59,7 +59,7 @@ export default function PayrollPage() {
       ) : !hasWork ? (
         <>
           <div className="pr-empty">No exams on the books for {monthName}. Use the arrows to pick another month.</div>
-          {hasPrivate && <PrivateOfficeSection groups={monthPrivate} monthName={monthName} onMark={markDeducted} onRate={setOfficeRate} />}
+          {hasPrivate && <PrivateOfficeSection groups={monthPrivate} rates={examinerRates} monthName={monthName} onMark={markDeducted} onRate={setOfficeRate} />}
         </>
       ) : (
         <>
@@ -94,8 +94,8 @@ export default function PayrollPage() {
           </div>
 
           {/* Private exams held at the office → fees to deduct (10/15) */}
-          {monthPrivate.length > 0 && (
-            <PrivateOfficeSection groups={monthPrivate} monthName={monthName} onMark={markDeducted} onRate={setOfficeRate} />
+          {examinerRates.length > 0 && (
+            <PrivateOfficeSection groups={monthPrivate} rates={examinerRates} monthName={monthName} onMark={markDeducted} onRate={setOfficeRate} />
           )}
 
           {/* Secondary: raw submissions + exports */}
@@ -125,35 +125,88 @@ export default function PayrollPage() {
 
 // Private exams at the SAPPS office — the reminder for payroll to take
 // each examiner's office fees out of their pay, then mark them deducted.
-function PrivateOfficeSection({ groups, monthName, onMark, onRate }) {
+function PrivateOfficeSection({ groups, rates, monthName, onMark, onRate }) {
   const owedTotal = groups.reduce((n, g) => n + g.owed, 0)
+  const pendingTotal = groups.reduce((n, g) => n + g.pending, 0)
   const [err, setErr] = useState('')
+  const shown = groups.filter((g) => g.blocks.length > 0 || g.flags.length > 0 || g.rate != null)
   return (
     <section className="pr-private">
       <div className="pr-private-head">
         <div>
           <h3>Private office use — deduct from pay</h3>
           <p>
-            Private exams examiners held at the SAPPS office in {monthName}. Take each examiner's fees
-            out of their paycheck, then mark them deducted.
+            Private exams examiners held at the SAPPS office in {monthName}, plus any earlier ones not yet
+            deducted. Take each examiner's fees out of their paycheck, then mark them deducted.
           </p>
         </div>
         <span className={`pr-pill ${owedTotal > 0 ? 'waiting' : 'clear'}`}>
           {owedTotal > 0 ? `$${money(owedTotal)} to deduct` : '✓ Nothing to deduct'}
         </span>
       </div>
+      {pendingTotal > 0 && (
+        <div className="pr-flags">
+          <span className="pr-flags-label">
+            {pendingTotal} private office {pendingTotal === 1 ? 'exam has' : 'exams have'} no fee yet —
+            set that examiner's rate below and it fills in automatically.
+          </span>
+        </div>
+      )}
       {err && <div className="cal-error">{err}</div>}
-      <div className="pr-private-cards">
-        {groups.map((g) => <PrivateCard key={g.id} g={g} monthName={monthName} onMark={onMark} onRate={onRate} onError={setErr} />)}
-      </div>
+      {shown.length > 0 && (
+        <div className="pr-private-cards">
+          {shown.map((g) => <PrivateCard key={g.id} g={g} monthName={monthName} onMark={onMark} onError={setErr} />)}
+        </div>
+      )}
+      <details className="pr-rates">
+        <summary>Office fee rates (per private exam at the office)</summary>
+        <ul>
+          {rates.map((r) => (
+            <li key={r.id}><span>{r.name}</span><RateEditor who={r} onRate={onRate} onError={setErr} /></li>
+          ))}
+        </ul>
+        <p className="pr-rate-note">
+          A new rate applies to private exams logged from then on, and fills in any logged without a fee.
+          Exams that already have a fee keep it.
+        </p>
+      </details>
     </section>
   )
 }
 
-function PrivateCard({ g, monthName, onMark, onRate, onError }) {
+function RateEditor({ who, onRate, onError }) {
+  const [edit, setEdit] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [editRate, setEditRate] = useState(false)
-  const [rate, setRate] = useState(g.rate == null ? '' : String(g.rate))
+  const [val, setVal] = useState(who.rate == null ? '' : String(who.rate))
+  const first = (who.name || '').split(' ')[0]
+  async function save() {
+    setBusy(true); onError('')
+    const { error: e } = await onRate(who.id, val)
+    setBusy(false)
+    if (e) onError(e); else setEdit(false)
+  }
+  return edit ? (
+    <span className="pr-rate-edit">
+      $<input type="number" min="0" step="1" value={val} onChange={(e) => setVal(e.target.value)} aria-label={`${first}'s office fee per exam`} autoFocus />
+      <button className="link" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+      <button className="link" onClick={() => { setVal(who.rate == null ? '' : String(who.rate)); setEdit(false) }}>Cancel</button>
+    </span>
+  ) : (
+    <span className="pr-rate-edit">
+      <strong>{who.rate == null ? 'not set' : `$${money(who.rate)}`}</strong>
+      <button className="link" onClick={() => setEdit(true)}>Change</button>
+    </span>
+  )
+}
+
+const FLAG_TEXT = {
+  removed: 'Removed',
+  'not-office': 'Switched to “not at the office”',
+  moved: 'Moved',
+}
+
+function PrivateCard({ g, monthName, onMark, onError }) {
+  const [busy, setBusy] = useState(false)
   const first = g.name.split(' ')[0]
 
   async function run(fn) {
@@ -165,7 +218,7 @@ function PrivateCard({ g, monthName, onMark, onRate, onError }) {
   }
 
   return (
-    <div className={`pr-card ${g.owed > 0 ? 'waiting' : 'clear'}`}>
+    <div className={`pr-card ${g.owed > 0 || g.pending > 0 ? 'waiting' : 'clear'}`}>
       <div className="pr-card-head">
         <span className="pr-card-name">{g.name}</span>
         {g.owed > 0
@@ -174,36 +227,42 @@ function PrivateCard({ g, monthName, onMark, onRate, onError }) {
       </div>
 
       <div className="pr-rate">
-        {editRate ? (
-          <span className="pr-rate-edit">
-            $<input type="number" min="0" step="1" value={rate} onChange={(e) => setRate(e.target.value)} aria-label={`${first}'s office fee per exam`} autoFocus />
-            per exam
-            <button className="link" disabled={busy} onClick={async () => { if (await run(() => onRate(g.id, rate))) setEditRate(false) }}>Save</button>
-            <button className="link" onClick={() => { setRate(g.rate == null ? '' : String(g.rate)); setEditRate(false) }}>Cancel</button>
-          </span>
-        ) : (
-          <>
-            Office fee: <strong>{g.rate == null ? 'not set' : `$${money(g.rate)} per exam`}</strong>
-            <button className="link" onClick={() => setEditRate(true)}>Change</button>
-          </>
-        )}
+        Office fee: <strong>{g.rate == null ? 'not set' : `$${money(g.rate)} per exam`}</strong>
       </div>
-      {editRate && <p className="pr-rate-note">Applies to private exams logged from now on. Ones already logged keep their fee.</p>}
 
       {g.blocks.length === 0 ? (
         <p className="pr-card-line">No private office exams logged in {monthName}.</p>
       ) : (
         <ul className="pr-private-list">
           {g.blocks.map((b) => (
-            <li key={b.id} className={b.deducted_at ? 'done' : !g.owedIds.includes(b.id) ? 'upcoming' : ''}>
+            <li key={b.id} className={b.deducted_at ? 'done' : b.upcoming || b.office_fee == null ? 'upcoming' : ''}>
               <span>
                 {format(parseISO(b.block_date), 'EEE, MMM d')} · {timeRange(b.start_time, b.duration_minutes)}
-                {!b.deducted_at && !g.owedIds.includes(b.id) && <em className="pr-upcoming"> upcoming</em>}
+                {b.carried && !b.deducted_at && <em className="pr-carried"> from an earlier month</em>}
+                {!b.deducted_at && b.upcoming && <em className="pr-upcoming"> upcoming</em>}
               </span>
-              <span className="pr-private-fee">${money(b.office_fee)}{b.deducted_at ? ' ✓' : ''}</span>
+              <span className="pr-private-fee">
+                {b.office_fee == null ? <em className="pr-upcoming">fee not set</em> : `$${money(b.office_fee)}`}{b.deducted_at ? ' ✓' : ''}
+              </span>
             </li>
           ))}
         </ul>
+      )}
+
+      {g.flags.length > 0 && (
+        <div className="pr-flags">
+          <span className="pr-flags-label">Changed by {first}:</span>
+          <ul>
+            {g.flags.map((f) => (
+              <li key={f.id}>
+                {FLAG_TEXT[f.kind]} — private exam {format(parseISO(f.date), 'EEE, MMM d')} · {timeRange(f.start, f.minutes)}
+                {f.kind === 'moved' && f.toDate ? <> → {format(parseISO(f.toDate), 'EEE, MMM d')} · {String(f.toStart || '').slice(0, 5)}</> : null}
+                {f.fee != null ? ` (fee $${money(f.fee)})` : ''}
+                <span className="pr-flags-when"> · {format(parseISO(f.at), 'MMM d, h:mm a')}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {g.owedIds.length > 0 && (

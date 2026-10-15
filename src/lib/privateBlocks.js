@@ -28,14 +28,19 @@ const fromMin = (n) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-/** "10:00–12:00" */
-export const timeRange = (start, minutes) =>
-  `${String(start || '').slice(0, 5)}–${fromMin(toMin(start) + (Number(minutes) || 0))}`
+/** "10:00–12:00" (an end past midnight shows as 24:00) */
+export const timeRange = (start, minutes) => {
+  const end = toMin(start) + (Number(minutes) || 0)
+  return `${String(start || '').slice(0, 5)}–${end >= 1440 ? '24:00' : fromMin(end)}`
+}
 
-/** Two same-day time spans overlap (touching end-to-start doesn't count). */
+/**
+ * Two same-day time spans overlap (touching end-to-start doesn't count).
+ * Spans are capped at midnight — overnight holds aren't a real case here.
+ */
 export function spansOverlap(startA, minA, startB, minB) {
-  const a0 = toMin(startA), a1 = a0 + (Number(minA) || 60)
-  const b0 = toMin(startB), b1 = b0 + (Number(minB) || 60)
+  const a0 = toMin(startA), a1 = Math.min(a0 + (Number(minA) || 60), 1440)
+  const b0 = toMin(startB), b1 = Math.min(b0 + (Number(minB) || 60), 1440)
   return a0 < b1 && b0 < a1
 }
 
@@ -44,23 +49,33 @@ const localToday = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** "YYYY-MM-DDTHH:MM" for now — compared against a block's date+time. */
+const localNowKey = () => {
+  const d = new Date()
+  return `${localToday()}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+const startKey = (date, time) => `${date}T${String(time || '00:00').slice(0, 5)}`
+
+/** Has this date/time already arrived? (Locks at START TIME, not midnight.) */
+export const hasStarted = (date, time) => startKey(date, time) <= localNowKey()
+
 /**
  * Can this person change/remove this block? Mirrors the database guard:
  * the office always; the examiner only their own, not yet deducted, and
- * dated today or later.
+ * not yet started.
  */
 export function canEditBlock(block, { userId, isOffice }) {
   if (isOffice) return true
   if (!block || block.examiner_id !== userId) return false
   if (block.deducted_at) return false
-  return block.block_date >= localToday()
+  return !hasStarted(block.block_date, block.start_time)
 }
 
 export const blockLockedReason = (block, { userId, isOffice }) => {
   if (isOffice || !block) return ''
   if (block.examiner_id !== userId) return ''
   if (block.deducted_at) return 'Payroll has already deducted this office fee, so it’s locked. Ask the office if something needs to change.'
-  if (block.block_date < localToday()) return 'Past private exams are locked. Ask the office if something needs to change.'
+  if (hasStarted(block.block_date, block.start_time)) return 'This private exam has already started, so it’s locked. Ask the office if something needs to change.'
   return ''
 }
 

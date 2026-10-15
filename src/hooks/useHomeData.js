@@ -28,7 +28,7 @@ export function useHomeData() {
       supabase.from('week_submissions').select('id, examiner_id, week_start, week_end'),
       supabase.from('users').select('id, name, email, role, active, is_examiner'),
       // Private office fees not yet deducted (any month, up to today).
-      fetchAll(() => supabase.from('private_blocks').select('id, block_date, office_fee, at_office, deducted_at').order('id')),
+      fetchAll(() => supabase.from('private_blocks').select('id, block_date, start_time, office_fee, at_office, deducted_at').order('id')),
     ])
 
     const exams = examRes.data || []
@@ -50,10 +50,13 @@ export function useHomeData() {
 
     const d = new Date()
     const todayISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const owed = (privRes.data || []).filter((b) => b.at_office && !b.deducted_at && b.block_date <= todayISO && Number(b.office_fee) > 0)
+    // Started, not deducted, at the office. A fee of NULL ("not set yet")
+    // still counts as an exam to deal with.
+    const nowKey = `${todayISO}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    const owed = (privRes.data || []).filter((b) => b.at_office && !b.deducted_at && `${b.block_date}T${String(b.start_time || '').slice(0, 5)}` <= nowKey && (b.office_fee == null || Number(b.office_fee) > 0))
 
     setState({
-      privateOwed: owed.reduce((n, b) => n + Number(b.office_fee), 0),
+      privateOwed: owed.reduce((n, b) => n + (Number(b.office_fee) || 0), 0),
       privateOwedCount: owed.length,
       readyToInvoice: orgs.length - invoiced,
       invoiced,
