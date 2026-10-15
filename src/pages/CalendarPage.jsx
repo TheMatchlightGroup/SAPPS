@@ -14,6 +14,8 @@ import CompletionModal from '../components/CompletionModal'
 import WeekSummaryPanel from '../components/WeekSummaryPanel'
 import ExaminerKey from '../components/ExaminerKey'
 import DayDrawer from '../components/DayDrawer'
+import PrivateBlockModal from '../components/PrivateBlockModal'
+import { timeRange } from '../lib/privateBlocks'
 import '../styles/calendar.css'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -26,6 +28,7 @@ export default function CalendarPage() {
     createBooking, updateBooking, fetchIntake, completeExam, changeExamType, deleteExam, submitWeek,
     waiveReport, unwaiveReport,
     availability, changeAvailability, setAvailabilityNote, setExaminerColor,
+    privateBlocks, savePrivateBlock, deletePrivateBlock,
   } = useCalendarData()
 
   const { user, role } = useAuth()
@@ -37,7 +40,7 @@ export default function CalendarPage() {
 
   const [view, setView] = useState('month') // 'month' | 'agenda'
   const [cursor, setCursor] = useState(new Date())
-  const [modal, setModal] = useState(null) // { type:'new', date } | { type:'complete', exam } | { type:'edit', exam }
+  const [modal, setModal] = useState(null) // { type:'new', date } | { type:'complete', exam } | { type:'edit', exam } | { type:'private', block?, date? }
   const [drawerDate, setDrawerDate] = useState(null)
   const [paint, setPaint] = useState(false)
   const [brush, setBrush] = useState(null)
@@ -65,6 +68,15 @@ export default function CalendarPage() {
   // A remembered examiner who's no longer on the roster: show everyone.
   const only = showFilter && onlyId ? examiners.find((e) => e.id === onlyId) || null : null
   const shownExams = useMemo(() => (only ? exams.filter((e) => e.examiner_id === only.id) : exams), [exams, only])
+  const shownBlocks = useMemo(() => (only ? privateBlocks.filter((b) => b.examiner_id === only.id) : privateBlocks), [privateBlocks, only])
+  // Examiners log their own private exams; the office can log for anyone.
+  const canLogPrivate = iAmExaminer || isOffice
+
+  const blocksByDate = useMemo(() => {
+    const map = {}
+    for (const b of shownBlocks) (map[b.block_date] ||= []).push(b)
+    return map
+  }, [shownBlocks])
 
   const examsByDate = useMemo(() => {
     const map = {}
@@ -100,6 +112,11 @@ export default function CalendarPage() {
     setModal({ type: 'new', date: dateISO || format(new Date(), 'yyyy-MM-dd') })
   }
   const openComplete = (exam) => setModal({ type: 'complete', exam })
+  const openPrivate = (block) => setModal({ type: 'private', block })
+  const openNewPrivate = (dateISO) => {
+    if (!canLogPrivate) return
+    setModal({ type: 'private', block: null, date: dateISO || format(new Date(), 'yyyy-MM-dd') })
+  }
   const closeModal = () => setModal(null)
   const openDay = (iso) => setDrawerDate(iso)
 
@@ -130,6 +147,10 @@ export default function CalendarPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [modal, drawerDate, paint])
 
+  const drawerBlocks = useMemo(
+    () => (drawerDate ? [...(blocksByDate[drawerDate] || [])].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')) : []),
+    [drawerDate, blocksByDate]
+  )
   const drawerExams = useMemo(
     () => (drawerDate ? [...(examsByDate[drawerDate] || [])].sort((a, b) => (a.exam_time || '').localeCompare(b.exam_time || '')) : []),
     [drawerDate, examsByDate]
@@ -161,7 +182,7 @@ export default function CalendarPage() {
   return (
     <div className="cal-page">
       <SchedulePrint
-        exams={shownExams} cursor={cursor}
+        exams={shownExams} blocks={shownBlocks} cursor={cursor}
         only={only || (!showFilter && iAmExaminer ? examiners.find((e) => e.id === user?.id) || null : null)}
         examinerName={examinerName}
       />
@@ -172,6 +193,7 @@ export default function CalendarPage() {
         reportByExam={reportByExam}
         weekSubmissions={weekSubmissions}
         submitWeek={submitWeek}
+        privateBlocks={privateBlocks}
       />
 
       <div className="cal-toolbar">
@@ -202,6 +224,12 @@ export default function CalendarPage() {
             <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
             <button className={view === 'agenda' ? 'on' : ''} onClick={() => { setView('agenda'); setPaint(false) }}>Agenda</button>
           </div>
+          {canLogPrivate && (
+            <button className="btn cal-private-btn" onClick={() => openNewPrivate()}
+              title="Hold time for an exam you're running for your own company">
+              + Private Exam
+            </button>
+          )}
           {canBook && (
             <button className="btn btn-primary" onClick={() => openNew()}>+ New Booking</button>
           )}
@@ -233,19 +261,19 @@ export default function CalendarPage() {
           )}
           <MonthView
             cursor={cursor} setCursor={setCursor}
-            examsByDate={examsByDate} examinerName={examinerName} examinerColor={examinerColor}
+            examsByDate={examsByDate} blocksByDate={blocksByDate} examinerName={examinerName} examinerColor={examinerColor}
             availableByDate={showAvailability ? availableByDate : {}}
             focusId={focusId}
             paint={paint} brush={examiners.find((e) => e.id === brush) || null}
             isAvailable={isAvailable} onStroke={change}
-            onDayOpen={openDay} onExamClick={openComplete}
+            onDayOpen={openDay} onExamClick={openComplete} onBlockClick={openPrivate}
           />
         </>
       ) : (
         <AgendaView
-          exams={shownExams} examinerName={examinerName} examinerColor={examinerColor}
+          exams={shownExams} blocks={shownBlocks} examinerName={examinerName} examinerColor={examinerColor}
           canBook={canBook} filtered={Boolean(only)}
-          onNew={() => openNew()} onExamClick={openComplete}
+          onNew={() => openNew()} onExamClick={openComplete} onBlockClick={openPrivate}
         />
       )}
 
@@ -268,6 +296,10 @@ export default function CalendarPage() {
           canBook={canBook}
           onNewBooking={(iso) => openNew(iso)}
           onExamClick={openComplete}
+          blocks={drawerBlocks}
+          onBlockClick={openPrivate}
+          canLogPrivate={canLogPrivate}
+          onNewPrivate={(iso) => openNewPrivate(iso)}
         />
       )}
 
@@ -275,6 +307,7 @@ export default function CalendarPage() {
         <BookingModal
           examiners={examiners}
           defaultDate={modal.date}
+          exams={exams} privateBlocks={privateBlocks} examinerName={examinerName}
           isAvailable={showAvailability ? isAvailable : null}
           hasAvailabilityFor={(iso) => Object.keys(availableByDate).some((k) => k.slice(0, 7) === iso.slice(0, 7))}
           onClose={closeModal}
@@ -285,10 +318,26 @@ export default function CalendarPage() {
         <BookingModal
           examiners={examiners}
           exam={modal.exam}
+          exams={exams} privateBlocks={privateBlocks} examinerName={examinerName}
           isAvailable={showAvailability ? isAvailable : null}
           hasAvailabilityFor={(iso) => Object.keys(availableByDate).some((k) => k.slice(0, 7) === iso.slice(0, 7))}
           onClose={closeModal}
           onSave={(form) => updateBooking(modal.exam.id, form)}
+        />
+      )}
+      {modal?.type === 'private' && (
+        <PrivateBlockModal
+          block={modal.block}
+          defaultDate={modal.date}
+          examiners={examiners}
+          userId={user?.id}
+          isOffice={isOffice}
+          exams={exams}
+          privateBlocks={privateBlocks}
+          examinerName={examinerName}
+          onSave={savePrivateBlock}
+          onDelete={deletePrivateBlock}
+          onClose={closeModal}
         />
       )}
       {modal?.type === 'complete' && (
@@ -314,9 +363,9 @@ export default function CalendarPage() {
 }
 
 function MonthView({
-  cursor, setCursor, examsByDate, examinerName, examinerColor,
+  cursor, setCursor, examsByDate, blocksByDate = {}, examinerName, examinerColor,
   availableByDate, focusId, paint, brush, isAvailable, onStroke,
-  onDayOpen, onExamClick,
+  onDayOpen, onExamClick, onBlockClick,
 }) {
   const days = useMemo(() => {
     const gridStart = startOfWeek(startOfMonth(cursor))
@@ -398,6 +447,12 @@ function MonthView({
         {days.map((day) => {
           const iso = format(day, 'yyyy-MM-dd')
           const dayExams = examsByDate[iso] || []
+          const dayBlocks = blocksByDate[iso] || []
+          // SAPPS exams and private exams share the day's chip list, by time.
+          const items = [
+            ...dayExams.map((ex) => ({ kind: 'exam', t: ex.exam_time || '', ex })),
+            ...dayBlocks.map((b) => ({ kind: 'private', t: b.start_time || '', b })),
+          ].sort((a, b) => a.t.localeCompare(b.t))
           const avail = availableByDate[iso] || []
           const muted = !isSameMonth(day, cursor)
           const today = isSameDay(day, new Date())
@@ -412,7 +467,7 @@ function MonthView({
           }
           const dimmed = !paint && focusId && !tintColor
 
-          const label = `${format(day, 'EEEE, MMMM d')}${avail.length ? `, ${avail.length} available` : ''}${dayExams.length ? `, ${dayExams.length} ${dayExams.length === 1 ? 'exam' : 'exams'}` : ''}`
+          const label = `${format(day, 'EEEE, MMMM d')}${avail.length ? `, ${avail.length} available` : ''}${dayExams.length ? `, ${dayExams.length} ${dayExams.length === 1 ? 'exam' : 'exams'}` : ''}${dayBlocks.length ? `, ${dayBlocks.length} private` : ''}`
 
           return (
             <div key={iso}
@@ -440,7 +495,16 @@ function MonthView({
                 )}
               </div>
               <div className="day-exams">
-                {dayExams.slice(0, MAX_CHIPS).map((ex) => (
+                {items.slice(0, MAX_CHIPS).map((it) => it.kind === 'private' ? (
+                  <div key={it.b.id}
+                    className={`chip private${focusId && it.b.examiner_id !== focusId ? ' faded' : ''}`}
+                    style={{ '--c': examinerColor(it.b.examiner_id) || undefined, '--pc-tint': examinerColor(it.b.examiner_id) ? tint(examinerColor(it.b.examiner_id), 0.18) : undefined }}
+                    onClick={(e) => { if (paint) return; e.stopPropagation(); onBlockClick(it.b) }}
+                    title={`Private exam ${timeRange(it.b.start_time, it.b.duration_minutes)} • ${examinerName(it.b.examiner_id)}${it.b.at_office ? ' • at the SAPPS office' : ''}`}>
+                    <span className="chip-time">{it.b.start_time?.slice(0, 5)}</span>
+                    <span className="chip-name">Private · {examinerName(it.b.examiner_id).split(' ')[0]}</span>
+                  </div>
+                ) : ((ex) => (
                   <div key={ex.id}
                     className={`chip${ex.status === 'completed' ? ' done' : ''}${focusId && ex.examiner_id !== focusId ? ' faded' : ''}`}
                     style={{ '--c': examinerColor(ex.examiner_id) || undefined }}
@@ -449,11 +513,11 @@ function MonthView({
                     <span className="chip-time">{ex.exam_time?.slice(0, 5)}</span>
                     <span className="chip-name">{ex.client_name}</span>
                   </div>
-                ))}
-                {dayExams.length > MAX_CHIPS && (
+                ))(it.ex))}
+                {items.length > MAX_CHIPS && (
                   <button type="button" className="chip-more"
                     onClick={(e) => { if (paint) return; e.stopPropagation(); onDayOpen(iso) }}>
-                    +{dayExams.length - MAX_CHIPS} more
+                    +{items.length - MAX_CHIPS} more
                   </button>
                 )}
               </div>
@@ -465,8 +529,12 @@ function MonthView({
   )
 }
 
-function AgendaView({ exams, examinerName, examinerColor, canBook, filtered = false, onNew, onExamClick }) {
-  if (exams.length === 0) {
+function AgendaView({ exams, blocks = [], examinerName, examinerColor, canBook, filtered = false, onNew, onExamClick, onBlockClick }) {
+  const rows = useMemo(() => [
+    ...exams.map((ex) => ({ kind: 'exam', k: `${ex.exam_date} ${ex.exam_time || ''}`, ex })),
+    ...blocks.map((b) => ({ kind: 'private', k: `${b.block_date} ${b.start_time || ''}`, b })),
+  ].sort((a, b) => a.k.localeCompare(b.k)), [exams, blocks])
+  if (rows.length === 0) {
     return (
       <div className="cal-empty">
         {filtered ? (
@@ -481,7 +549,27 @@ function AgendaView({ exams, examinerName, examinerColor, canBook, filtered = fa
   }
   return (
     <div className="agenda">
-      {exams.map((ex) => (
+      {rows.map((r) => r.kind === 'private' ? (
+        <div key={r.b.id} className="agenda-row private" onClick={() => onBlockClick(r.b)}>
+          <div className="agenda-when">
+            <span className="agenda-date">{format(parseISO(r.b.block_date), 'EEE, MMM d')}</span>
+            <span className="agenda-time">{r.b.start_time?.slice(0, 5)}</span>
+          </div>
+          <div className="agenda-main">
+            <span className="agenda-name">Private exam</span>
+            <span className="agenda-meta">
+              {timeRange(r.b.start_time, r.b.duration_minutes)} · {r.b.at_office ? 'At the SAPPS office' : 'Not at the office'}
+            </span>
+          </div>
+          <div className="agenda-side">
+            <span className="agenda-examiner">
+              <span className="agenda-dot" style={{ '--c': examinerColor(r.b.examiner_id) || 'transparent' }} aria-hidden="true" />
+              {examinerName(r.b.examiner_id)}
+            </span>
+            <span className="status-pill private">private</span>
+          </div>
+        </div>
+      ) : ((ex) => (
         <div key={ex.id} className="agenda-row" onClick={() => onExamClick(ex)}>
           <div className="agenda-when">
             <span className="agenda-date">{format(parseISO(ex.exam_date), 'EEE, MMM d')}</span>
@@ -501,7 +589,7 @@ function AgendaView({ exams, examinerName, examinerColor, canBook, filtered = fa
             <span className={`status-pill ${ex.status}`}>{ex.status}</span>
           </div>
         </div>
-      ))}
+      ))(r.ex))}
     </div>
   )
 }
@@ -509,17 +597,26 @@ function AgendaView({ exams, examinerName, examinerColor, canBook, filtered = fa
 // Print-only: a day-by-day list of one month — everyone, or the one
 // examiner the calendar is narrowed to. Hidden on screen; "Print <Month>"
 // shows only this (see .sched-print in calendar.css).
-function SchedulePrint({ exams, cursor, only, examinerName }) {
+function SchedulePrint({ exams, blocks = [], cursor, only, examinerName }) {
   const ym = format(cursor, 'yyyy-MM')
   const days = useMemo(() => {
     const map = {}
     for (const ex of exams) if (ex.exam_date?.slice(0, 7) === ym) (map[ex.exam_date] ||= []).push(ex)
+    // Private exams print as "Private exam" rows so the office sees the hold.
+    for (const b of blocks) {
+      if (b.block_date?.slice(0, 7) !== ym) continue
+      ;(map[b.block_date] ||= []).push({
+        id: `pb-${b.id}`, private: true, exam_time: b.start_time, duration_minutes: b.duration_minutes,
+        client_name: 'Private exam', organization: b.at_office ? 'At the SAPPS office' : '—',
+        exam_type: timeRange(b.start_time, b.duration_minutes), examiner_id: b.examiner_id,
+      })
+    }
     return Object.keys(map).sort().map((d) => ({
       date: d,
       rows: map[d].sort((a, b) => (a.exam_time || '').localeCompare(b.exam_time || '')),
     }))
-  }, [exams, ym])
-  const total = days.reduce((n, d) => n + d.rows.length, 0)
+  }, [exams, blocks, ym])
+  const total = days.reduce((n, d) => n + d.rows.filter((r) => !r.private).length, 0)
   const who = only ? only.name : 'All examiners'
   return (
     <section className="sched-print" aria-hidden="true">
@@ -545,7 +642,7 @@ function SchedulePrint({ exams, cursor, only, examinerName }) {
               {rows.map((ex) => (
                 <tr key={ex.id}>
                   <td className="sp-time">{ex.exam_time?.slice(0, 5) || '—'}</td>
-                  <td className="sp-name">{ex.client_name}</td>
+                  <td className="sp-name">{ex.private ? <em>{ex.client_name}</em> : ex.client_name}</td>
                   <td>{ex.organization}</td>
                   <td>{ex.exam_type || 'Type TBD'}</td>
                   <td className="sp-len">{ex.duration_minutes ? `${ex.duration_minutes} min` : ''}</td>

@@ -17,6 +17,9 @@ export function useCalendarData() {
   // Office-only (RLS returns nothing to examiners / team leads).
   // Keyed `${examiner_id}__${date}` -> { examiner_id, date, note }
   const [availability, setAvailability] = useState({})
+  // Private exams (the examiner's own company work). Office sees all;
+  // examiners and team leads see only their own (RLS).
+  const [privateBlocks, setPrivateBlocks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -25,7 +28,7 @@ export function useCalendarData() {
   // drawer) doesn't blink out to "Loading…" every time something changes.
   const load = useCallback(async () => {
     setError('')
-    const [examRes, examinerRes, intakeRes, weekRes, reportRes, availRes] = await Promise.all([
+    const [examRes, examinerRes, intakeRes, weekRes, reportRes, availRes, privRes] = await Promise.all([
       fetchAll(() => supabase
         .from('exams')
         .select('id, client_name, exam_date, exam_time, exam_type, organization, duration_minutes, status, examiner_id')
@@ -36,7 +39,7 @@ export function useCalendarData() {
       // Cris is payroll_admin AND runs her own exams.
       supabase
         .from('users')
-        .select('id, name, color')
+        .select('id, name, color, email, private_office_fee')
         .eq('is_examiner', true)
         .eq('active', true)
         .order('name', { ascending: true }),
@@ -46,7 +49,7 @@ export function useCalendarData() {
         .order('exam_id')),
       fetchAll(() => supabase
         .from('week_submissions')
-        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, total_net, submitted_at')
+        .select('id, examiner_id, examiner_name, week_start, week_end, total_exams, completed_exams, total_revenue, total_net, private_office_count, submitted_at')
         .order('week_start', { ascending: false })
         .order('id')),
       fetchAll(() => supabase
@@ -58,6 +61,11 @@ export function useCalendarData() {
         .select('examiner_id, date, note')
         .order('date')
         .order('examiner_id')),
+      fetchAll(() => supabase
+        .from('private_blocks')
+        .select('id, examiner_id, block_date, start_time, duration_minutes, at_office, office_fee, note, deducted_at')
+        .order('block_date')
+        .order('id')),
     ])
     if (examRes.error) setError(examRes.error.message)
 
@@ -77,6 +85,7 @@ export function useCalendarData() {
     const avail = {}
     for (const r of availRes.data || []) avail[`${r.examiner_id}__${r.date}`] = r
     setAvailability(avail)
+    setPrivateBlocks(privRes.data || [])
     setLoading(false)
   }, [])
 
@@ -160,6 +169,36 @@ export function useCalendarData() {
     if (error) { await load(); return { error: error.message } }
     return { error: null }
   }, [load])
+
+  // ---- Private exams ----
+  // The database fills the fee from the examiner's rate and enforces who
+  // may change what (see 20261015_private_blocks.sql).
+  async function savePrivateBlock(form, id = null) {
+    const row = {
+      examiner_id: form.examiner_id,
+      block_date: form.block_date,
+      start_time: form.start_time,
+      duration_minutes: Number(form.duration_minutes) || 120,
+      at_office: Boolean(form.at_office),
+      note: (form.note || '').trim() || null,
+      updated_by: user?.email ?? null,
+    }
+    // Only the office sends a fee (the database ignores it from examiners).
+    if (form.office_fee !== undefined) row.office_fee = form.office_fee === '' || form.office_fee === null ? null : Number(form.office_fee)
+    const { error } = id
+      ? await supabase.from('private_blocks').update(row).eq('id', id)
+      : await supabase.from('private_blocks').insert(row)
+    if (error) return { error: error.message }
+    await load()
+    return { error: null }
+  }
+
+  async function deletePrivateBlock(id) {
+    const { error } = await supabase.from('private_blocks').delete().eq('id', id)
+    if (error) return { error: error.message }
+    await load()
+    return { error: null }
+  }
 
   async function createBooking(form) {
     const { error } = await supabase.from('exams').insert({
@@ -267,6 +306,7 @@ export function useCalendarData() {
         completed_exams: payload.completed_exams,
         total_revenue: payload.total_revenue,
         total_net: payload.total_net,
+        private_office_count: payload.private_office_count ?? null,
         submitted_at: new Date().toISOString(),
         submitted_by: user?.email ?? null,
       },
@@ -313,6 +353,7 @@ export function useCalendarData() {
 
   return {
     exams, examiners, examinerName, examinerColor, intakeByExam, reportByExam, weekSubmissions,
+    privateBlocks, savePrivateBlock, deletePrivateBlock,
     availability, changeAvailability, setAvailabilityNote, setExaminerColor,
     loading, error, refetch: load,
     createBooking, updateBooking, fetchIntake, completeExam, changeExamType, deleteExam, submitWeek,

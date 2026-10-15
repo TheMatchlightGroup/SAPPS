@@ -294,3 +294,19 @@
 .sp-table.one .c-org { width: 30%; }
 .sp-table.one .c-type { width: 20%; }
 .sp-table.one .c-name { width: 25%; }
+
+/* Private exams (10/15): hatched, light — clearly "busy", clearly not a SAPPS exam. */
+.chip.private {
+  background: repeating-linear-gradient(135deg, #fff 0 5px, var(--pc-tint, rgba(6,20,26,.08)) 5px 10px);
+  color: var(--ink-900); border: 1px solid var(--line-strong); border-left: 3px solid var(--c, var(--ink-700));
+}
+.chip.private .chip-time { color: var(--ink-700); }
+.chip.private .chip-name { font-style: italic; }
+.agenda-row.private .agenda-name { font-style: italic; }
+.agenda-row.private { background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(6,20,26,.035) 6px 12px); }
+.status-pill.private { background: rgba(6,20,26,.08); color: var(--ink-700); }
+.cal-private-btn {
+  background: #fff; color: var(--ink-900); border: 1px solid var(--line-strong);
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(6,20,26,.05) 5px 10px);
+}
+.cal-private-btn:hover { border-color: var(--gold-deep); }

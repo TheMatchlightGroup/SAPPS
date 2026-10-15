@@ -38,3 +38,11 @@
   .home-tiles { grid-template-columns: 1fr 1fr; }
   .home-tile.primary { grid-column: 1 / -1; }
 }
+
+/* Private office fees waiting to be deducted (10/15) */
+.tile-flag {
+  display: inline-block; align-self: flex-start; margin-top: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(196,162,76,.22); color: var(--gold-deep);
+  font-size: 0.85rem; font-weight: 700;
+}

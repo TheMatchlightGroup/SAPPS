@@ -26,7 +26,7 @@ try:
     pg2=ctx.new_page(); pg2.on('pageerror', lambda e: errs.append('EX '+str(e)))
     pg2.add_init_script('window.__QA_ROLE="examiner"')
     pg2.goto('http://localhost:4173/'); pg2.wait_for_timeout(800); pg2.screenshot(path='/home/claude/qa_examiner.png', full_page=True)
-    pg2.click('text=T. Boyd'); pg2.wait_for_timeout(500); pg2.screenshot(path='/home/claude/qa_complete.png', full_page=True)
+    pg2.click('.chip >> text=T. Boyd'); pg2.wait_for_timeout(500); pg2.screenshot(path='/home/claude/qa_complete.png', full_page=True)
     b.close()
 finally:
   srv.terminate()

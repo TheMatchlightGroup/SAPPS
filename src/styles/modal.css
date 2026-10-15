@@ -143,3 +143,26 @@
   font-size: 0.8rem; color: #7a4a12;
   background: rgba(196,162,76,.16); border: 1px solid rgba(196,162,76,.45);
 }
+
+/* Private exam modal (10/15) */
+.pb-intro { font-size: 0.86rem; color: var(--ink-700); margin: 0; line-height: 1.5; }
+.pb-optional { font-weight: 400; opacity: 0.6; font-size: 0.8em; }
+.pb-office {
+  display: flex; gap: 12px; align-items: flex-start; cursor: pointer;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid var(--line-strong); background: #fff;
+}
+.pb-office.on { border-color: var(--gold); background: rgba(196,162,76,.08); }
+.pb-office input { width: auto; margin-top: 3px; flex: none; }
+.pb-office-text { display: flex; flex-direction: column; gap: 2px; font-size: 0.86rem; color: var(--ink-700); }
+.pb-office-text strong { color: var(--ink-900); font-size: 0.92rem; }
+.pb-warn-sub { margin-top: 4px; opacity: 0.75; }
+
+/* Private exams in the week-submit confirmation */
+.pb-attest { border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 12px 14px; background: var(--paper); }
+.pb-attest-title { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-700); margin-bottom: 6px; }
+.pb-attest ul { margin: 0 0 10px; padding-left: 18px; font-size: 0.86rem; }
+.pb-attest-none { font-size: 0.86rem; margin: 0 0 10px; color: var(--ink-700); }
+.pb-attest label { display: flex; gap: 10px; align-items: flex-start; font-size: 0.86rem; font-weight: 600; cursor: pointer; }
+.pb-attest label input { width: auto; margin-top: 2px; flex: none; }
+.pb-attest-hint { font-size: 0.78rem; color: var(--ink-700); opacity: 0.7; margin-top: 6px; }

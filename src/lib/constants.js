@@ -60,6 +60,11 @@ export const ORGANIZATIONS = {
     // One Fauquier entry: Fire & Rescue, Schools, etc. all bill to the county (per Cris, 9/29).
     'Fauquier County Government',
   ],
+  // Added 10/15 per Cris. Only Brad, Rob and Cris run these (see
+  // ORG_DIRECTORY.examiners); the Exam Amount varies per exam.
+  Federal: [
+    'United States Probation Office',
+  ],
   'State & Treatment Programs': [
     'Sex Offender Treatment Program',
     'Sex Offender Programs & Monitoring Unit',
@@ -384,6 +389,18 @@ export const ORG_DIRECTORY = {
     ],
   },
 
+  // Added 10/15/2026 per Cris. Cell (202) 870-8717 · Fax (202) 791-8458.
+  // No billing email yet — add one here when SAPPS has it.
+  // `examiners` = the only people the booking dropdown offers for this
+  // agency. Exam Amount varies; Brad (Tier 2), Rob and Cris (Tier 3) can
+  // all set it in the completion modal (default $225 until changed).
+  'United States Probation Office': {
+    code: 'USPO', // PROVISIONAL code — confirm
+    billTo: ['United States Probation Office', '333 Constitution Ave. NW', 'Washington, DC 20001'],
+    examiners: ['bdhhwt@gmail.com', 'rjsmithpolygraph@gmail.com', 'crissmithpolygraph@gmail.com'],
+    variableAmount: true,
+  },
+
   'Sex Offender Treatment Program': {
     code: 'SOPC',
     emails: [
@@ -419,4 +436,8 @@ export const orgAddressLines = (name) => {
   return b && b.length > 1 ? b.slice(1) : []
 }
 export const orgEmails = (name) => ORG_DIRECTORY[name]?.emails || []
+/** Emails of the only examiners who take this agency's exams, or null (anyone). */
+export const orgExaminers = (name) => ORG_DIRECTORY[name]?.examiners || null
+/** Agencies whose Exam Amount changes exam to exam. */
+export const orgHasVariableAmount = (name) => Boolean(ORG_DIRECTORY[name]?.variableAmount)
 export const orgIsServicing = (name) => ORG_DIRECTORY[name]?.servicing !== false

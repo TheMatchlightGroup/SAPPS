@@ -9,9 +9,18 @@ const ym = new Date().toISOString().slice(0, 7)
 const tables = {
   users: [
     { id: 'u-admin', email: 'qa@sapps.test', name: 'QA Admin', role: 'payroll_admin', active: true, is_examiner: false, must_change_password: false },
-    { id: 'u-brad', email: 'bdhhwt@gmail.com', name: 'Brad Hughes', role: 'examiner', color: '#4A86D6', active: true, is_examiner: true, must_change_password: true },
+    { id: 'u-brad', email: 'bdhhwt@gmail.com', name: 'Brad Hughes', role: 'examiner', color: '#4A86D6', active: true, is_examiner: true, must_change_password: true, private_office_fee: 75 },
     { id: 'u-lead', email: 'lead@sapps.test', name: 'Lee Lead', role: 'team_lead', active: true, is_examiner: true, must_change_password: false },
     { id: 'u-al', email: 'amoorepoly@yahoo.com', name: 'Al Moore', role: 'examiner', active: true, is_examiner: true, must_change_password: false },
+    { id: 'u-marc', email: 'marcbmitchell@gmail.com', name: 'Marc Mitchell', role: 'examiner', color: '#CF5A83', active: true, is_examiner: true, must_change_password: false, private_office_fee: 100 },
+    { id: 'u-rob', email: 'rjsmithpolygraph@gmail.com', name: 'Robert Smith', role: 'payroll_admin', color: '#D0613F', active: true, is_examiner: true, must_change_password: false },
+  ],
+  private_blocks: [
+    { id: 'pb1', examiner_id: 'u-brad', block_date: d(-8), start_time: '14:00:00', duration_minutes: 120, at_office: true, office_fee: 75, note: null, deducted_at: null },
+    { id: 'pb2', examiner_id: 'u-brad', block_date: d(2), start_time: '10:30:00', duration_minutes: 120, at_office: true, office_fee: 75, note: 'Room B', deducted_at: null },
+    { id: 'pb3', examiner_id: 'u-marc', block_date: d(-2), start_time: '09:00:00', duration_minutes: 180, at_office: true, office_fee: 100, note: null, deducted_at: null },
+    { id: 'pb5', examiner_id: 'u-al', block_date: d(-12), start_time: '15:00:00', duration_minutes: 90, at_office: true, office_fee: 60, note: null, deducted_at: null },
+    { id: 'pb4', examiner_id: 'u-marc', block_date: d(1), start_time: '13:00:00', duration_minutes: 60, at_office: false, office_fee: 0, note: null, deducted_at: null },
   ],
   exams: [
     { id: 'e1', client_name: 'T. Boyd', exam_date: d(-9), exam_time: '13:00', exam_type: 'Maintenance', organization: 'Manassas', duration_minutes: 90, status: 'completed', examiner_id: 'u-brad' },
@@ -65,7 +74,15 @@ function q(table) {
     delete() { mode = 'delete'; return api },
     then(res) {
       let out = rows.filter((r) => filters.every((f) => f(r)))
-      if (table === 'exams' && mode === 'select' && qaRole === 'examiner') out = out.filter((r) => r.examiner_id === who.id)
+      if ((table === 'exams' || table === 'private_blocks') && mode === 'select' && qaRole === 'examiner') out = out.filter((r) => r.examiner_id === who.id)
+      // Stand-in for the database guard: fee comes from the examiner's rate.
+      if (table === 'private_blocks' && (mode === 'insert' || mode === 'update')) {
+        const arr = [].concat(payload)
+        for (const a of arr) if ('at_office' in a && a.office_fee == null) {
+          const ex = tables.users.find((u) => u.id === (a.examiner_id || out[0]?.examiner_id))
+          a.office_fee = a.at_office ? (ex?.private_office_fee || 0) : 0
+        }
+      }
       if (mode === 'upsert' && conflict) {
         out = []
         for (const a of [].concat(payload)) {

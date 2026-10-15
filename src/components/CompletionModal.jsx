@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES, sameReportTemplate } from '../lib/constants'
+import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES, sameReportTemplate, orgHasVariableAmount } from '../lib/constants'
 import { REPORT_STATUS_LABEL } from '../lib/reportUtils'
 import { DEFAULT_EXAM_AMOUNT, initialExamAmount, normalizeIntake } from '../lib/amounts'
 import { canAdjustCompletion, isOffice } from '../lib/roles'
@@ -224,7 +224,9 @@ export default function CompletionModal({
 
               <CurrencyField
                 label="Exam Amount"
-                hint={canEditExamAmount
+                hint={canEditExamAmount && orgHasVariableAmount(exam.organization)
+                  ? `${exam.organization} pricing varies — enter what SAPPS is charging for this exam`
+                  : canEditExamAmount
                   ? `What SAPPS charges ${exam.organization || 'the client'} for this exam — $${DEFAULT_EXAM_AMOUNT} unless it's a special case`
                   : 'What SAPPS charges the client — set by the office'}
                 value={fin.exam_amount}

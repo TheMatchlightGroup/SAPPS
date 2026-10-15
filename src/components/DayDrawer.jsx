@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { TEST_TYPE_ABBR } from '../lib/constants'
+import { timeRange } from '../lib/privateBlocks'
 import '../styles/day-drawer.css'
 
 /**
@@ -10,13 +11,15 @@ import '../styles/day-drawer.css'
  *
  *   Available  (office only) — tap names to mark who's free, add a note
  *   Exams      every booking that day; tap one to open it
- *   Footer     + New booking (office only)
+ *   Private    examiners' own-company exams (time held, office use)
+ *   Footer     + New booking (office only) · + Private exam (examiners)
  */
 export default function DayDrawer({
   date, onClose, onShiftDay,
   exams, examiners, examinerName, examinerColor,
   showAvailability, availableFor, onToggleAvailable, onNote,
   canBook, onNewBooking, onExamClick,
+  blocks = [], onBlockClick, canLogPrivate = false, onNewPrivate,
 }) {
   const d = parseISO(date)
   const panelRef = useRef(null)
@@ -134,13 +137,54 @@ export default function DayDrawer({
               </div>
             )}
           </section>
+
+          {(blocks.length > 0 || canLogPrivate) && (
+            <section className="dd-sec">
+              <div className="dd-sec-head">
+                <h4>Private exams</h4>
+                <span className="dd-count">{blocks.length}</span>
+              </div>
+              {blocks.length === 0 ? (
+                <p className="dd-empty">None logged. Running one for your own company? Log it so the time is held.</p>
+              ) : (
+                <div className="dd-exams">
+                  {blocks.map((b) => (
+                    <button key={b.id} type="button" className="dd-exam private"
+                      style={{ '--c': examinerColor(b.examiner_id) || 'var(--ink-700)' }}
+                      onClick={() => onBlockClick(b)}>
+                      <span className="dd-exam-time">{b.start_time?.slice(0, 5)}</span>
+                      <span className="dd-exam-main">
+                        <span className="dd-exam-name">Private exam</span>
+                        <span className="dd-exam-meta">
+                          {timeRange(b.start_time, b.duration_minutes)} · {b.at_office ? 'At the SAPPS office' : 'Not at the office'}
+                          {b.note ? ` · ${b.note}` : ''}
+                        </span>
+                        <span className="dd-exam-who">
+                          <span className="dd-dot" aria-hidden="true" />
+                          {examinerName(b.examiner_id)}
+                        </span>
+                      </span>
+                      <span className="status-pill private">private</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
 
-        {canBook && (
+        {(canBook || canLogPrivate) && (
           <footer className="dd-foot">
-            <button type="button" className="btn btn-primary dd-new" onClick={() => onNewBooking(date)}>
-              + New booking on {format(d, 'MMM d')}
-            </button>
+            {canBook && (
+              <button type="button" className="btn btn-primary dd-new" onClick={() => onNewBooking(date)}>
+                + New booking on {format(d, 'MMM d')}
+              </button>
+            )}
+            {canLogPrivate && (
+              <button type="button" className="btn dd-new dd-new-private" onClick={() => onNewPrivate(date)}>
+                + Private exam on {format(d, 'MMM d')}
+              </button>
+            )}
           </footer>
         )}
       </aside>

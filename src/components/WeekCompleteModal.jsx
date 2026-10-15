@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { format, parseISO } from 'date-fns'
+import { timeRange } from '../lib/privateBlocks'
 import '../styles/modal.css'
 
 const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -6,6 +8,9 @@ const money = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionD
 export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit = false }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [attested, setAttested] = useState(false)
+  const pb = summary.privateBlocks || []
+  const needsAttest = Boolean(summary.usesOffice)
 
   async function handleSubmit() {
     setError('')
@@ -19,6 +24,7 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
       completed_exams: summary.completed_exams,
       total_revenue: summary.total_revenue,
       total_net: summary.total_net,
+      private_office_count: needsAttest ? pb.length : null,
     })
     setBusy(false)
     if (error) setError(error)
@@ -52,6 +58,35 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
             <div className="week-totals-grand"><span>Examiner net pay</span><span>${money(summary.net)}</span></div>
           </div>
 
+          {needsAttest && (
+            <div className="pb-attest">
+              <div className="pb-attest-title">Private exams at the SAPPS office</div>
+              {pb.length === 0 ? (
+                <p className="pb-attest-none">None logged for this week.</p>
+              ) : (
+                <ul>
+                  {pb.map((b) => (
+                    <li key={b.id}>
+                      {format(parseISO(b.block_date), 'EEE, MMM d')} · {timeRange(b.start_time, b.duration_minutes)} — office fee ${money(b.office_fee)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label>
+                <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} />
+                <span>
+                  {pb.length === 0
+                    ? 'I did not hold any private exams at the SAPPS office this week.'
+                    : `These are all of the private exams I held at the SAPPS office this week ($${money(summary.privateFees)} in office fees).`}
+                </span>
+              </label>
+              <div className="pb-attest-hint">
+                Missing one? Close this, add it with “+ Private Exam” on the calendar, then submit.
+                Office fees are deducted from pay by payroll, separately from the totals above.
+              </div>
+            </div>
+          )}
+
           <div className="week-examinees">
             <span className="week-examinees-label">Examinees this week</span>
             <ul>{summary.examineeNames.map((n, i) => <li key={i}>{n}</li>)}</ul>
@@ -60,7 +95,8 @@ export default function WeekCompleteModal({ summary, onSubmit, onClose, resubmit
 
         <footer className="modal-foot">
           <button className="btn btn-text" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSubmit} disabled={busy}>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={busy || (needsAttest && !attested)}
+            title={needsAttest && !attested ? 'Confirm your private office exams first' : undefined}>
             {busy ? 'Submitting…' : resubmit ? 'Re-submit Week' : 'Submit Week'}
           </button>
         </footer>

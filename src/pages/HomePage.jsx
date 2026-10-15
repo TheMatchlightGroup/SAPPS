@@ -13,7 +13,7 @@ export default function HomePage() {
   const { profile } = useAuth()
   const {
     readyToInvoice, invoiced, totalOrgs, weeks, monthName, loading,
-    payrollOutstanding, payrollHasWork, payrollAllIn,
+    payrollOutstanding, payrollHasWork, payrollAllIn, privateOwed, privateOwedCount,
   } = useHomeData()
 
   const first = profile?.name ? profile.name.split(' ')[0] : ''
@@ -64,6 +64,12 @@ export default function HomePage() {
                 : payrollHasWork ? `${weeks} ${weeks === 1 ? 'week' : 'weeks'} submitted — ready to export`
                   : 'examiner submissions show up here'}
           </span>
+          {!loading && privateOwedCount > 0 && (
+            <span className="tile-flag">
+              ${privateOwed.toLocaleString('en-US', { minimumFractionDigits: 2 })} in private office fees to deduct
+              ({privateOwedCount} {privateOwedCount === 1 ? 'exam' : 'exams'})
+            </span>
+          )}
           <span className="tile-go">Go to Payroll →</span>
         </button>
 

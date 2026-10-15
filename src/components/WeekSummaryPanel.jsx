@@ -5,6 +5,7 @@ import { reportOverdue, reportSatisfied, REPORT_GRACE_BUSINESS_DAYS } from '../l
 import { NO_REPORT_TYPES } from '../lib/constants'
 import { sumAmounts } from '../lib/amounts'
 import { isSelfScoped } from '../lib/roles'
+import { officeBlocksIn } from '../lib/privateBlocks'
 import WeekCompleteModal from './WeekCompleteModal'
 import '../styles/week-summary.css'
 
@@ -16,7 +17,7 @@ const rangeLabel = (startISO) => {
   return `${format(s, 'MMM d')} – ${format(endOfWeek(s, { weekStartsOn: 1 }), 'MMM d')}`
 }
 
-export default function WeekSummaryPanel({ exams, examiners, intakeByExam, reportByExam = {}, weekSubmissions, submitWeek }) {
+export default function WeekSummaryPanel({ exams, examiners, intakeByExam, reportByExam = {}, weekSubmissions, submitWeek, privateBlocks = [] }) {
   const { user, role } = useAuth()
   // Examiners and team leads see (and submit) only their own week.
   const isExaminer = isSelfScoped(role)
@@ -105,6 +106,18 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
     [reportsMissing]
   )
 
+  // Private exams held at the SAPPS office this week (10/15). Examiners
+  // with an office fee on file must confirm the list when they submit;
+  // the fees come out of their pay separately (Payroll → Private office use).
+  const weekPrivate = useMemo(
+    () => (examinerId ? officeBlocksIn(privateBlocks, wStartISO, wEndISO, examinerId) : [])
+      .sort((a, b) => (a.block_date + a.start_time).localeCompare(b.block_date + b.start_time)),
+    [privateBlocks, examinerId, wStartISO, wEndISO]
+  )
+  const privateFees = weekPrivate.reduce((n, b) => n + (Number(b.office_fee) || 0), 0)
+  const examinerRow = examiners.find((e) => e.id === examinerId)
+  const usesOffice = examinerRow?.private_office_fee != null || weekPrivate.length > 0
+
   const [showConfirm, setShowConfirm] = useState(false)
 
   // A submitted week goes STALE when its exams change afterward — an exam
@@ -116,7 +129,10 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
       Math.abs(Number(existing.total_revenue) - summary.revenue) > 0.005 ||
       // Net pay (commission − office use) is tracked for weeks submitted
       // after it was added; older rows (null) skip this check.
-      (existing.total_net != null && Math.abs(Number(existing.total_net) - summary.net) > 0.005)
+      (existing.total_net != null && Math.abs(Number(existing.total_net) - summary.net) > 0.005) ||
+      // Private office exams logged/removed after submitting (rows from
+      // before 10/15 have null and skip this).
+      (existing.private_office_count != null && Number(existing.private_office_count) !== weekPrivate.length)
     )
   )
 
@@ -180,6 +196,16 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
         <Stat label={isExaminer ? 'Your Net Pay' : 'Examiner Net Pay'} value={`$${money(summary?.net)}`}
           sub={summary ? `$${money(summary.commission)} commission − $${money(summary.office)} office use` : ''} />
       </div>
+
+      {usesOffice && (
+        <p className="week-private">
+          <strong>Private exams at the SAPPS office this week:</strong>{' '}
+          {weekPrivate.length === 0
+            ? 'none logged.'
+            : `${weekPrivate.length} · $${money(privateFees)} office ${weekPrivate.length === 1 ? 'fee' : 'fees'}, deducted by payroll.`}
+          {' '}Log any you've held with “+ Private Exam” on the calendar before you submit.
+        </p>
+      )}
 
       {/* Report gate notices */}
       {reportsBlocking.length > 0 && (!existing || stale) && (
@@ -259,6 +285,9 @@ export default function WeekSummaryPanel({ exams, examiners, intakeByExam, repor
             net: summary.net,
             total_revenue: summary.revenue,
             total_net: summary.net,
+            usesOffice,
+            privateBlocks: weekPrivate,
+            privateFees,
           }}
           onSubmit={submitWeek}
           resubmit={stale}
