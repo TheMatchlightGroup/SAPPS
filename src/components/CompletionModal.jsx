@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES, sameReportTemplate, orgHasVariableAmount } from '../lib/constants'
+import { TEST_TYPES, TEST_TYPE_BILLING_DEFAULTS, NO_REPORT_TYPES, NO_SHOW_REPORT_TYPES, reportRequired, sameReportTemplate, orgHasVariableAmount } from '../lib/constants'
 import { REPORT_STATUS_LABEL } from '../lib/reportUtils'
 import { DEFAULT_EXAM_AMOUNT, initialExamAmount, normalizeIntake } from '../lib/amounts'
 import { canAdjustCompletion, isOffice } from '../lib/roles'
@@ -261,7 +261,7 @@ export default function CompletionModal({
                     <span className="rp-pill waived">Not required</span>
                   </div>
                   <p className="mnote" style={{ fontSize: '0.8rem', opacity: 0.65, margin: 0 }}>
-                    No-shows don't require a written report.
+                    Probation no-shows don't require a written report.
                   </p>
                 </div>
               )}
@@ -286,9 +286,16 @@ export default function CompletionModal({
                         type="button"
                         onClick={() => { onClose(); navigate(`/reports/exam/${exam.id}`) }}
                       >
-                        {report ? 'Open report →' : 'Fill out the report →'}
+                        {report ? 'Open report →' : NO_SHOW_REPORT_TYPES.includes(exam.exam_type) ? 'Fill out the No-Show Report →' : 'Fill out the report →'}
                       </button>
-                      {!report && (
+                      {NO_SHOW_REPORT_TYPES.includes(exam.exam_type) && !report && (
+                        <p className="mnote" style={{ fontSize: '0.8rem', opacity: 0.65, margin: 0 }}>
+                          {reportRequired(exam)
+                            ? 'The agency needs a No-Show Report — name, date and time fill in for you.'
+                            : 'Optional for no-shows before 10/23/2026.'}
+                        </p>
+                      )}
+                      {!report && !NO_SHOW_REPORT_TYPES.includes(exam.exam_type) && (
                         <label className="report-waive">
                           <input
                             type="checkbox"

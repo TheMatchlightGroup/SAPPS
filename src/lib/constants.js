@@ -95,9 +95,24 @@ export const TEST_TYPE_BILLING_DEFAULTS = {
   'Pre-Employment No Show': { exam_amount: '100', copay_amount: '0', amount_due_examiner: '0', amount_due_sapps: '0' },
 }
 
-// No-shows produce no written report — exempt from the report requirement
-// and the week-submit gate.
-export const NO_REPORT_TYPES = ['Probation No Show', 'Pre-Employment No Show']
+// Probation no-shows produce no written report — exempt from the report
+// requirement and the week-submit gate.
+export const NO_REPORT_TYPES = ['Probation No Show']
+
+// Pre-employment no-shows (10/23/2026, per Cris): the agencies now want a
+// written No-Show Report, so these use the "Pre-Employment No Show Report"
+// template and count toward the report requirement like any other exam.
+// Exams dated before the go-live date stay optional, so no-shows already
+// on the calendar don't suddenly block a week.
+export const NO_SHOW_REPORT_TYPES = ['Pre-Employment No Show']
+export const NO_SHOW_REPORT_REQUIRED_FROM = '2026-10-23'
+
+/** Does this exam need a written report before its week goes to payroll? */
+export const reportRequired = (exam) => {
+  if (!exam || NO_REPORT_TYPES.includes(exam.exam_type)) return false
+  if (NO_SHOW_REPORT_TYPES.includes(exam.exam_type)) return (exam.exam_date || '') >= NO_SHOW_REPORT_REQUIRED_FROM
+  return true
+}
 export const TEST_TYPE_ABBR = Object.fromEntries(TEST_TYPES.map((t) => [t.value, t.abbr]))
 
 // Test types that share one report template (mirrors report_templates.test_types).

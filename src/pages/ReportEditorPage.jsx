@@ -71,8 +71,8 @@ function ReportEditorPage({ examId }) {
       setResult(report.result || '')
     } else {
       setHeader(buildPrefillHeader(template.header_fields, exam, orgAddress))
-      setSections((template.sections || []).map((s) => ({ ...s })))
-      setResult('')
+      setSections(templateSections(template, exam))
+      setResult(onlyResult(template))
     }
     setDirty(false)
   }, [loading, exam, template, report, orgAddress])
@@ -231,7 +231,7 @@ function ReportEditorPage({ examId }) {
 
   async function moveToTemplate() {
     const byTitle = new Map(sections.map((s) => [s.title, s]))
-    const next = (template.sections || []).map((s) => (byTitle.has(s.title) ? { ...s, body: byTitle.get(s.title).body } : { ...s }))
+    const next = templateSections(template, exam).map((s) => (byTitle.has(s.title) ? { ...s, body: byTitle.get(s.title).body } : s))
     const dropped = sections.filter((s) => !tplTitles.includes(s.title)).map((s) => s.title)
     const added = tplTitles.filter((t) => !byTitle.has(t))
     const msg = [
@@ -256,7 +256,7 @@ function ReportEditorPage({ examId }) {
       'The current text is saved in History first — you can restore it from there.'
     )
     if (!ok) return
-    await loadContent({ header: headerFor(template), sections: (template.sections || []).map((s) => ({ ...s })), result: '' }, 'manual',
+    await loadContent({ header: headerFor(template), sections: templateSections(template, exam), result: onlyResult(template) }, 'manual',
       { extra: { template_id: template.id }, message: 'Reloaded from the template ✓' })
   }
 
@@ -559,6 +559,19 @@ function CopyPanel({ find, defaultQuery, onPick, onClose }) {
     </div>
   )
 }
+
+// Template text can carry {{name}} / {{agency}}, filled from the exam when a
+// report is started (used by the No-Show Report so the examiner only adds
+// notes). Templates without tokens are unchanged.
+function templateSections(tpl, exam) {
+  const fill = (t) => String(t || '')
+    .replace(/\{\{\s*name\s*\}\}/gi, exam.client_name || '________________')
+    .replace(/\{\{\s*agency\s*\}\}/gi, exam.organization || '________________')
+  return (tpl.sections || []).map((s) => ({ ...s, title: fill(s.title), body: fill(s.body) }))
+}
+
+// A template with a single possible result (No Show) pre-selects it.
+const onlyResult = (tpl) => ((tpl?.results || []).length === 1 ? tpl.results[0] : '')
 
 function buildPrefillHeader(fields, exam, savedAddress) {
   const h = {}
