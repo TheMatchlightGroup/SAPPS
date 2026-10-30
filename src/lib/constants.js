@@ -283,7 +283,8 @@ export const ORG_DIRECTORY = {
   },
   'Alexandria Fire Department': {
     code: 'AFD', // PROVISIONAL code — confirm
-    billTo: ['Alexandria Fire Department', '900 Second St.', 'Alexandria, VA 22314'],
+    // Address confirmed by the agency 10/30/2026.
+    billTo: ['City of Alexandria Fire Department', '900 Second St.', 'Alexandria, VA 22314'],
     emails: ['Tiffany.Joy@alexandriava.gov'],
   },
   'Arlington County Fire & Rescue': {

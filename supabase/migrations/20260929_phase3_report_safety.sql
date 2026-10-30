@@ -97,5 +97,5 @@ create policy org_addresses_update on public.org_addresses for update to authent
 
 insert into public.org_addresses (organization, address, updated_by) values
   ('Fauquier County Government', E'320 Hospital Drive, Third Floor\nWarrenton, VA 20186', 'setup'),
-  ('Alexandria Fire Department', E'City of Alexandria\n100 North Pitt Street, Suite No. 301\nAlexandria, VA 22314', 'setup')
+  ('Alexandria Fire Department', E'900 Second St.\nAlexandria, VA 22314', 'setup')
 on conflict (organization) do nothing;
