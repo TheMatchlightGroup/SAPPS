@@ -6,7 +6,7 @@ import '../styles/modal.css'
 // the temp-password banner. Supabase enforces its own minimum (6); we ask for
 // 8 so the passwords people set here are at least a little better than the
 // temporary one they came in with.
-export default function ChangePasswordModal({ onClose, required = false }) {
+export default function ChangePasswordModal({ onClose, required = false, recovering = false }) {
   const { updatePassword } = useAuth()
   const [pw1, setPw1] = useState('')
   const [pw2, setPw2] = useState('')
@@ -50,7 +50,9 @@ export default function ChangePasswordModal({ onClose, required = false }) {
             <div className="modal-body">
               {required && (
                 <p className="mnote" style={{ marginBottom: 'var(--s-4)' }}>
-                  You signed in with a temporary password. Choose your own to keep going.
+                  {recovering
+                    ? 'Choose a new password to finish resetting it.'
+                    : 'You signed in with a temporary password. Choose your own to keep going.'}
                 </p>
               )}
               <div className="field">

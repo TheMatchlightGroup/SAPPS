@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import ChangePasswordModal from './ChangePasswordModal'
@@ -6,12 +6,14 @@ import { ROLE_LABEL } from '../lib/roles'
 
 export default function AppNav() {
   const { pathname } = useLocation()
-  const { profile, role, signOut } = useAuth()
+  const { profile, role, signOut, recovering } = useAuth()
 
   // Today / Payroll / Invoicing are admin-only; examiners just see Calendar.
   const isAdmin = role === 'payroll_admin'
-  const [pwOpen, setPwOpen] = useState(false)
-  const mustChange = Boolean(profile?.must_change_password)
+  // Arriving from a password-reset email opens the dialog straight away.
+  const [pwOpen, setPwOpen] = useState(recovering)
+  useEffect(() => { if (recovering) setPwOpen(true) }, [recovering])
+  const mustChange = Boolean(profile?.must_change_password) || recovering
 
   return (
     <>
@@ -64,7 +66,7 @@ export default function AppNav() {
         <button className="pw-banner-btn" onClick={() => setPwOpen(true)}>Set your own password →</button>
       </div>
     )}
-    {pwOpen && <ChangePasswordModal required={mustChange} onClose={() => setPwOpen(false)} />}
+    {pwOpen && <ChangePasswordModal required={mustChange} recovering={recovering} onClose={() => setPwOpen(false)} />}
     </>
   )
 }

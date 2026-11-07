@@ -56,3 +56,12 @@
 }
 .auth-toggle button { color: var(--gold-bright); font-weight: 600; font-size: 0.85rem; }
 .auth-toggle button:hover { text-decoration: underline; }
+
+.auth-notice {
+  background: rgba(196,162,76,.12);
+  border: 1px solid rgba(196,162,76,.45);
+  color: var(--cream);
+  padding: 10px 13px; border-radius: var(--radius);
+  font-size: 0.86rem; margin-bottom: var(--s-4);
+}
+.auth-toggle-sub { margin-top: var(--s-3); font-size: 0.8rem; }

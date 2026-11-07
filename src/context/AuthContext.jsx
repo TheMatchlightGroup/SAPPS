@@ -3,25 +3,52 @@ import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
 
+// A password-reset email link lands with "#...type=recovery" in the URL.
+// Capture it at module load, before supabase-js parses and clears the hash,
+// so we can force the "choose a new password" dialog even if the
+// PASSWORD_RECOVERY event fires before our listener is attached.
+const RECOVERY_IN_URL =
+  typeof window !== 'undefined' && /type=recovery/.test(window.location.hash)
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null) // row from public.users
   const [loading, setLoading] = useState(true)
+  // True while the user arrived via a password-reset link and hasn't set a
+  // new password yet.
+  const [recovering, setRecovering] = useState(RECOVERY_IN_URL)
 
   // The user id whose profile is currently loaded — lets us skip redundant
   // reloads when auth events fire for the same signed-in user (e.g.
   // TOKEN_REFRESHED), which otherwise happen constantly.
   const loadedUserId = useRef(null)
+  // In-flight profile load, keyed by user id. Sign-in and the auth listener
+  // both ask for the profile; sharing one request stops them racing (two
+  // racing loads for a brand-new user = two inserts, the second fails and
+  // wipes the profile).
+  const inflight = useRef({ uid: null, promise: null })
 
   // Load the caller's profile row; create it (as examiner) if it doesn't
   // exist yet. This replaces the auth.users trigger — profile creation now
   // happens here, on sign-in, where errors are visible.
-  const loadProfile = useCallback(async (user) => {
+  const loadProfile = useCallback((user) => {
     if (!user) {
       loadedUserId.current = null
+      inflight.current = { uid: null, promise: null }
       setProfile(null)
-      return
+      return Promise.resolve()
     }
+    if (inflight.current.uid === user.id && inflight.current.promise) {
+      return inflight.current.promise
+    }
+    const promise = fetchProfile(user).finally(() => {
+      if (inflight.current.promise === promise) inflight.current = { uid: null, promise: null }
+    })
+    inflight.current = { uid: user.id, promise }
+    return promise
+  }, [])
+
+  const fetchProfile = async (user) => {
 
     // maybeSingle() returns null (no error) when the row doesn't exist yet.
     let { data, error } = await supabase
@@ -60,7 +87,7 @@ export function AuthProvider({ children }) {
 
     loadedUserId.current = data ? user.id : null
     setProfile(data ?? null)
-  }, [])
+  }
 
   useEffect(() => {
     let active = true
@@ -82,8 +109,10 @@ export function AuthProvider({ children }) {
     // "app hangs on Loading… until you refresh" bug. So: do synchronous
     // state updates only, and defer any data fetching out of the callback
     // with setTimeout so the lock is released first.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession)
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      if (event === 'SIGNED_OUT') setRecovering(false)
 
       const uid = newSession?.user?.id ?? null
       if (uid === loadedUserId.current) return // same user; token refresh etc.
@@ -99,8 +128,28 @@ export function AuthProvider({ children }) {
     }
   }, [loadProfile])
 
-  const signIn = (email, password) =>
-    supabase.auth.signInWithPassword({ email, password })
+  // Sign in, then wait for the profile before handing control back, so the
+  // page we navigate to already knows the user's role. (Previously the
+  // redirect ran before the role loaded and admins got bounced off /today.)
+  const signIn = useCallback(async (email, password) => {
+    const res = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    })
+    if (!res.error && res.data?.session) {
+      setSession(res.data.session)
+      await loadProfile(res.data.session.user)
+    }
+    return res
+  }, [loadProfile])
+
+  // Email a password-reset link. The link must come back to this site, so
+  // the site's URL has to be listed under Supabase → Authentication → URL
+  // Configuration (Site URL / Redirect URLs).
+  const requestPasswordReset = (email) =>
+    supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: `${window.location.origin}/`,
+    })
 
   const signUp = (email, password, name) =>
     supabase.auth.signUp({ email, password, options: { data: { name } } })
@@ -114,10 +163,16 @@ export function AuthProvider({ children }) {
     const { error: rpcErr } = await supabase.rpc('complete_password_change')
     if (rpcErr) console.warn('Could not clear must_change_password flag:', rpcErr.message)
     setProfile((p) => (p ? { ...p, must_change_password: false } : p))
+    setRecovering(false)
     return { error: null }
   }, [])
 
-  const signOut = () => supabase.auth.signOut()
+  // scope: 'local' signs out THIS browser only. The supabase-js default is
+  // 'global', which revokes every session the account has — so tapping
+  // "Sign out" on the office PC silently logged the same person (or anyone
+  // sharing the account) out on their phone, and they then had to sign in
+  // again from scratch. That was the main source of the login trouble.
+  const signOut = () => supabase.auth.signOut({ scope: 'local' })
 
   const value = {
     session,
@@ -129,6 +184,8 @@ export function AuthProvider({ children }) {
     signUp,
     signOut,
     updatePassword,
+    requestPasswordReset,
+    recovering,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
