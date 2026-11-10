@@ -38,6 +38,10 @@ const tables = {
     { id: 'e8', client_name: 'Dana Whitfield', exam_date: d(-4), exam_time: '10:00', exam_type: 'Pre-Employment', organization: 'Fauquier County Government', duration_minutes: 120, status: 'completed', examiner_id: 'u-brad' },
     { id: 'e9', client_name: 'S. Vance', exam_date: d(-2), exam_time: '12:00', exam_type: 'Instant Offense', organization: 'Winchester', duration_minutes: 90, status: 'completed', examiner_id: 'u-brad' },
     { id: 'e10', client_name: 'Edward Mendoza', exam_date: d(0), exam_time: '17:00', exam_type: 'Pre-Employment No Show', organization: 'Arlington County Fire & Rescue', duration_minutes: 60, status: 'completed', examiner_id: 'u-brad' },
+    // 11/10 calendar search + agency filter fixtures
+    { id: 'e11', client_name: 'Dana Whitfield', exam_date: d(9), exam_time: '10:30', exam_type: 'Maintenance', organization: 'Suffolk', duration_minutes: 90, status: 'scheduled', examiner_id: 'u-marc' },
+    { id: 'e12', client_name: 'T. Boyd', exam_date: d(-45), exam_time: '09:00', exam_type: 'Sexual History', organization: 'Manassas', duration_minutes: 90, status: 'scheduled', examiner_id: 'u-brad' },
+    { id: 'e13', client_name: "Liam O'Neil-Park", exam_date: d(4), exam_time: '08:30', exam_type: null, organization: 'Arlington 911', duration_minutes: 90, status: 'scheduled', examiner_id: 'u-al' },
     { id: 'e5', client_name: 'A. Boyden', exam_date: d(-12), exam_time: '09:00', exam_type: 'Pre-Employment No Show', organization: 'Virginia Center for Behavioral Rehabilitation', duration_minutes: 60, status: 'completed', examiner_id: 'u-al' },
   ],
   intake_forms: [

@@ -30,7 +30,7 @@ export const ORGANIZATIONS = {
     'Lynchburg', 'Roanoke', 'Abingdon', 'Roanoke Headquarters', 'Bedford',
     'Martinsville', 'Chesterfield', 'Radford', 'Fairfax', 'Henrico',
     'Manassas', 'Alexandria', 'Rocky Mount', 'Fincastle', 'Tazewell',
-    'Newport News',
+    'Newport News', 'Suffolk',
   ],
   'Private Clients & Organizations': [
     'Center for Clinical and Forensic Services',
@@ -235,6 +235,13 @@ export const ORG_DIRECTORY = {
     code: 'D19',
     billTo: ['Newport News Probation & Parole (D19)', '250 Warwick Blvd.', 'Newport News, VA 23607'],
     emails: ['Carmen.Rodriguez@vadoc.virginia.gov', 'Maxine.lee@vadoc.virginia.gov'],
+  },
+  // Added 11/10/2026 per Cris. District number + office address from the
+  // VADOC Facilities & Offices page. No billing email yet — add here when
+  // SAPPS has one (invoices still generate; the email just has no recipient).
+  Suffolk: {
+    code: 'D6',
+    billTo: ['Suffolk Probation & Parole (D6)', '425 West Washington St., Suite 5', 'Suffolk, VA 23434'],
   },
 
   'Center for Clinical and Forensic Services': {

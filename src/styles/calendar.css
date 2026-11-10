@@ -310,3 +310,63 @@
   background-image: repeating-linear-gradient(135deg, transparent 0 5px, rgba(6,20,26,.05) 5px 10px);
 }
 .cal-private-btn:hover { border-color: var(--gold-deep); }
+
+/* ---- Find an examinee + agency filter (11/10) ---- */
+.exam-search { position: relative; }
+.exam-search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-52%);
+  font-size: 1.15rem; color: var(--ink-700); opacity: .6; pointer-events: none;
+}
+.exam-search-input {
+  width: 230px; padding: 8px 12px 8px 30px; font: inherit; font-size: 0.92rem;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--paper); color: var(--ink-900);
+}
+.exam-search-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(196, 162, 76, .22); background: #fff; }
+.exam-search-panel {
+  position: absolute; z-index: 40; top: calc(100% + 6px); left: 0;
+  width: min(560px, calc(100vw - 32px)); max-height: min(440px, 70vh); overflow-y: auto;
+  background: #fff; border: 1px solid var(--line-strong); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-ink); padding: 6px;
+}
+.es-row {
+  display: grid; grid-template-columns: 128px 1fr auto; gap: 12px; align-items: center;
+  padding: 8px 10px; border-radius: var(--radius); cursor: pointer;
+}
+.es-row.active { background: var(--cream); }
+.es-row.past { opacity: .82; }
+.es-when { display: flex; flex-direction: column; font-size: 0.8rem; color: var(--ink-700); }
+.es-date { font-weight: 600; }
+.es-main { display: flex; flex-direction: column; min-width: 0; }
+.es-name { font-weight: 700; color: var(--ink-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.es-meta { font-size: 0.8rem; color: var(--ink-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.es-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 0.8rem; }
+.es-examiner { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.es-divider {
+  margin: 6px 10px 2px; padding-top: 6px; border-top: 1px solid var(--line);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-700); opacity: .7;
+}
+.es-empty, .es-more { padding: 10px 12px; font-size: 0.85rem; color: var(--ink-700); }
+.es-more { border-top: 1px solid var(--line); margin-top: 4px; }
+
+.cal-org { max-width: 240px; }
+.cal-org.set { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(196, 162, 76, .45); }
+
+/* A found exam pulses gold for a few seconds. */
+@keyframes sapps-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 162, 76, 0); }
+  35%      { box-shadow: 0 0 0 4px rgba(196, 162, 76, .75); }
+}
+.day-cell.flash { animation: sapps-flash 1.2s ease-in-out 4; position: relative; z-index: 1; }
+.chip.flash { outline: 2px solid var(--gold); outline-offset: 1px; }
+.agenda-row.flash { animation: sapps-flash 1.2s ease-in-out 4; background: var(--cream); }
+
+@media (max-width: 640px) {
+  .cal-controls { width: 100%; }
+  .exam-search { flex: 1 1 100%; }
+  .exam-search-input { width: 100%; }
+  .exam-search-panel { width: 100%; }
+  .cal-show, .cal-org { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .es-row { grid-template-columns: 1fr auto; }
+  .es-when { grid-column: 1 / -1; flex-direction: row; gap: 8px; }
+}
+@media print { .exam-search { display: none; } }

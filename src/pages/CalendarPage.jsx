@@ -5,7 +5,7 @@ import {
 } from 'date-fns'
 import { useCalendarData } from '../hooks/useCalendarData'
 import { useAuth } from '../context/AuthContext'
-import { TEST_TYPE_ABBR } from '../lib/constants'
+import { TEST_TYPE_ABBR, ORGANIZATIONS } from '../lib/constants'
 import { isOffice as isOfficeRole, isAdmin } from '../lib/roles'
 import { weekStartOf } from '../lib/monthClose'
 import { tint } from '../lib/examinerColors'
@@ -15,6 +15,7 @@ import WeekSummaryPanel from '../components/WeekSummaryPanel'
 import ExaminerKey from '../components/ExaminerKey'
 import DayDrawer from '../components/DayDrawer'
 import PrivateBlockModal from '../components/PrivateBlockModal'
+import ExamSearch from '../components/ExamSearch'
 import { timeRange } from '../lib/privateBlocks'
 import '../styles/calendar.css'
 
@@ -67,8 +68,71 @@ export default function CalendarPage() {
   }
   // A remembered examiner who's no longer on the roster: show everyone.
   const only = showFilter && onlyId ? examiners.find((e) => e.id === onlyId) || null : null
-  const shownExams = useMemo(() => (only ? exams.filter((e) => e.examiner_id === only.id) : exams), [exams, only])
-  const shownBlocks = useMemo(() => (only ? privateBlocks.filter((b) => b.examiner_id === only.id) : privateBlocks), [privateBlocks, only])
+
+  // ---- Which agency (11/10, per Cris) ----
+  // Narrow the calendar to one district / agency — on its own or together
+  // with the examiner filter ("Brad's Fairfax exams"). Works everywhere the
+  // examiner filter does: month grid, day drawer, agenda, printed list.
+  // Private exams belong to no agency, so they drop out while it's on.
+  // Remembered per person on this device.
+  const orgKey = user?.id ? `sapps.calOrg.${user.id}` : null
+  const [orgFilter, setOrgFilterState] = useState(() => {
+    try { return (orgKey && localStorage.getItem(orgKey)) || '' } catch { return '' }
+  })
+  const setOrgFilter = (v) => {
+    setOrgFilterState(v)
+    try { if (orgKey) (v ? localStorage.setItem(orgKey, v) : localStorage.removeItem(orgKey)) } catch { /* private window */ }
+  }
+  // Dropdown: the booking list's groups, plus any agency that only exists on
+  // older exams (renamed since) so those can still be found.
+  const orgGroups = useMemo(() => {
+    const known = new Set(Object.values(ORGANIZATIONS).flat())
+    const extra = [...new Set(exams.map((e) => e.organization).filter((o) => o && !known.has(o)))]
+    if (orgFilter && !known.has(orgFilter) && !extra.includes(orgFilter)) extra.push(orgFilter)
+    const groups = Object.entries(ORGANIZATIONS).map(([g, items]) => [g, [...items].sort((a, b) => a.localeCompare(b))])
+    if (extra.length) groups.push(['Other (older exams)', extra.sort((a, b) => a.localeCompare(b))])
+    return groups
+  }, [exams, orgFilter])
+  const orgCount = useMemo(() => {
+    const m = {}
+    for (const e of exams) if (e.organization && (!only || e.examiner_id === only.id)) m[e.organization] = (m[e.organization] || 0) + 1
+    return m
+  }, [exams, only])
+
+  const filtering = Boolean(only || orgFilter)
+  const shownExams = useMemo(
+    () => (filtering ? exams.filter((e) => (!only || e.examiner_id === only.id) && (!orgFilter || e.organization === orgFilter)) : exams),
+    [exams, only, orgFilter, filtering]
+  )
+  const shownBlocks = useMemo(
+    () => (orgFilter ? [] : only ? privateBlocks.filter((b) => b.examiner_id === only.id) : privateBlocks),
+    [privateBlocks, only, orgFilter]
+  )
+
+  // ---- Find an examinee (11/10) ----
+  // Jump to the exam's month, open it, and pulse its day so it's easy to
+  // spot after the window closes. If a filter would hide it, that filter
+  // comes off — the office asked to see this exam.
+  const [flashId, setFlashId] = useState(null)
+  useEffect(() => {
+    if (!flashId) return
+    const t = setTimeout(() => setFlashId(null), 6000)
+    return () => clearTimeout(t)
+  }, [flashId])
+  function pickFromSearch(ex) {
+    if (only && ex.examiner_id !== only.id) setOnlyId('')
+    if (orgFilter && ex.organization !== orgFilter) setOrgFilter('')
+    setPaint(false)
+    setDrawerDate(null)
+    if (ex.exam_date) setCursor(parseISO(ex.exam_date))
+    setFlashId(ex.id)
+    openComplete(ex)
+  }
+  // In the agenda, bring the found row into view.
+  useEffect(() => {
+    if (!flashId || view !== 'agenda') return
+    document.querySelector(`.agenda-row[data-exam-id="${flashId}"]`)?.scrollIntoView?.({ block: 'center' })
+  }, [flashId, view])
   // Examiners log their own private exams; the office can log for anyone.
   const canLogPrivate = iAmExaminer || isOffice
 
@@ -184,6 +248,7 @@ export default function CalendarPage() {
       <SchedulePrint
         exams={shownExams} blocks={shownBlocks} cursor={cursor}
         only={only || (!showFilter && iAmExaminer ? examiners.find((e) => e.id === user?.id) || null : null)}
+        org={orgFilter}
         examinerName={examinerName}
       />
       <WeekSummaryPanel
@@ -199,15 +264,30 @@ export default function CalendarPage() {
       <div className="cal-toolbar">
         <div className="cal-title">
           <h2>Polygraph Calendar</h2>
-          {only && (
+          {filtering && (
             <div className="cal-only">
-              <span className="cal-only-dot" style={{ '--c': only.color || 'var(--ink-500)' }} aria-hidden="true" />
-              Showing only <strong>{only.id === user?.id ? 'your exams' : only.name}</strong>
-              <button className="link" onClick={() => setOnlyId('')}>Show everyone</button>
+              {only && <span className="cal-only-dot" style={{ '--c': only.color || 'var(--ink-500)' }} aria-hidden="true" />}
+              <span>
+                Showing only{' '}
+                {only && <strong>{only.id === user?.id ? 'your exams' : only.name}</strong>}
+                {only && orgFilter && ' at '}
+                {orgFilter && <strong>{orgFilter}</strong>}
+              </span>
+              {only && orgFilter ? (
+                <>
+                  <button className="link" onClick={() => setOnlyId('')}>All examiners</button>
+                  <button className="link" onClick={() => setOrgFilter('')}>All agencies</button>
+                </>
+              ) : (
+                <button className="link" onClick={() => (only ? setOnlyId('') : setOrgFilter(''))}>
+                  {only ? 'Show everyone' : 'All agencies'}
+                </button>
+              )}
             </div>
           )}
         </div>
         <div className="cal-controls">
+          <ExamSearch exams={exams} examinerName={examinerName} examinerColor={examinerColor} onPick={pickFromSearch} />
           {showFilter && examiners.length > 0 && (
             <select className="week-examiner cal-show" value={only ? only.id : ''} onChange={(e) => setOnlyId(e.target.value)}
               aria-label="Whose schedule to show">
@@ -216,9 +296,18 @@ export default function CalendarPage() {
               {examiners.filter((e) => e.id !== user?.id).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           )}
+          <select className={`week-examiner cal-show cal-org${orgFilter ? ' set' : ''}`} value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)}
+            aria-label="Which district or agency to show">
+            <option value="">All districts &amp; agencies</option>
+            {orgGroups.map(([group, items]) => (
+              <optgroup key={group} label={group}>
+                {items.map((o) => <option key={o} value={o}>{o}{orgCount[o] ? ` (${orgCount[o]})` : ''}</option>)}
+              </optgroup>
+            ))}
+          </select>
           <button className="btn btn-text cal-print-btn" onClick={printSchedule}
-            title={`Print or save as PDF a day-by-day list of ${format(cursor, 'MMMM yyyy')}${only ? ` for ${only.name}` : ' for everyone'}`}>
-            🖨 Print {format(cursor, 'MMMM')}{only ? ` · ${only.id === user?.id ? 'mine' : only.name.split(' ')[0]}` : ''}
+            title={`Print or save as PDF a day-by-day list of ${format(cursor, 'MMMM yyyy')}${only ? ` for ${only.name}` : ' for everyone'}${orgFilter ? ` at ${orgFilter}` : ''}`}>
+            🖨 Print {format(cursor, 'MMMM')}{only ? ` · ${only.id === user?.id ? 'mine' : only.name.split(' ')[0]}` : ''}{orgFilter ? ` · ${orgFilter}` : ''}
           </button>
           <div className="view-toggle">
             <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
@@ -263,7 +352,7 @@ export default function CalendarPage() {
             cursor={cursor} setCursor={setCursor}
             examsByDate={examsByDate} blocksByDate={blocksByDate} examinerName={examinerName} examinerColor={examinerColor}
             availableByDate={showAvailability ? availableByDate : {}}
-            focusId={focusId}
+            focusId={focusId} flashId={flashId}
             paint={paint} brush={examiners.find((e) => e.id === brush) || null}
             isAvailable={isAvailable} onStroke={change}
             onDayOpen={openDay} onExamClick={openComplete} onBlockClick={openPrivate}
@@ -272,7 +361,7 @@ export default function CalendarPage() {
       ) : (
         <AgendaView
           exams={shownExams} blocks={shownBlocks} examinerName={examinerName} examinerColor={examinerColor}
-          canBook={canBook} filtered={Boolean(only)}
+          canBook={canBook} filtered={filtering} flashId={flashId}
           onNew={() => openNew()} onExamClick={openComplete} onBlockClick={openPrivate}
         />
       )}
@@ -364,7 +453,7 @@ export default function CalendarPage() {
 
 function MonthView({
   cursor, setCursor, examsByDate, blocksByDate = {}, examinerName, examinerColor,
-  availableByDate, focusId, paint, brush, isAvailable, onStroke,
+  availableByDate, focusId, flashId = null, paint, brush, isAvailable, onStroke,
   onDayOpen, onExamClick, onBlockClick,
 }) {
   const days = useMemo(() => {
@@ -453,6 +542,11 @@ function MonthView({
             ...dayExams.map((ex) => ({ kind: 'exam', t: ex.exam_time || '', ex })),
             ...dayBlocks.map((b) => ({ kind: 'private', t: b.start_time || '', b })),
           ].sort((a, b) => a.t.localeCompare(b.t))
+          // A found exam past the chip cutoff swaps into the last visible slot.
+          if (flashId && items.length > MAX_CHIPS) {
+            const at = items.findIndex((it) => it.kind === 'exam' && it.ex.id === flashId)
+            if (at >= MAX_CHIPS) { const [hit] = items.splice(at, 1); items.splice(MAX_CHIPS - 1, 0, hit) }
+          }
           const avail = availableByDate[iso] || []
           const muted = !isSameMonth(day, cursor)
           const today = isSameDay(day, new Date())
@@ -466,6 +560,7 @@ function MonthView({
             if (hit) tintColor = hit.examiner.color
           }
           const dimmed = !paint && focusId && !tintColor
+          const flashing = Boolean(flashId && dayExams.some((ex) => ex.id === flashId))
 
           const label = `${format(day, 'EEEE, MMMM d')}${avail.length ? `, ${avail.length} available` : ''}${dayExams.length ? `, ${dayExams.length} ${dayExams.length === 1 ? 'exam' : 'exams'}` : ''}${dayBlocks.length ? `, ${dayBlocks.length} private` : ''}`
 
@@ -476,7 +571,7 @@ function MonthView({
               tabIndex={0}
               aria-label={paint && brush ? `${label}. ${painted(iso) ? 'Marked' : 'Not marked'} for ${brush.name}` : label}
               aria-pressed={paint && brush ? painted(iso) : undefined}
-              className={`day-cell${muted ? ' muted' : ''}${today ? ' today' : ''}${tintColor ? ' tinted' : ''}${dimmed ? ' dimmed' : ''}`}
+              className={`day-cell${muted ? ' muted' : ''}${today ? ' today' : ''}${tintColor ? ' tinted' : ''}${dimmed ? ' dimmed' : ''}${flashing ? ' flash' : ''}`}
               style={tintColor ? { '--tint': tint(tintColor, paint ? 0.2 : 0.14), '--tint-edge': tintColor } : undefined}
               onClick={paint ? undefined : () => onDayOpen(iso)}
               onKeyDown={(e) => cellKey(e, iso)}
@@ -506,7 +601,7 @@ function MonthView({
                   </div>
                 ) : ((ex) => (
                   <div key={ex.id}
-                    className={`chip${ex.status === 'completed' ? ' done' : ''}${focusId && ex.examiner_id !== focusId ? ' faded' : ''}`}
+                    className={`chip${ex.status === 'completed' ? ' done' : ''}${focusId && ex.examiner_id !== focusId ? ' faded' : ''}${flashId === ex.id ? ' flash' : ''}`}
                     style={{ '--c': examinerColor(ex.examiner_id) || undefined }}
                     onClick={(e) => { if (paint) return; e.stopPropagation(); onExamClick(ex) }}
                     title={`${ex.client_name} • ${ex.exam_type || 'Type TBD'} • ${examinerName(ex.examiner_id)}`}>
@@ -529,7 +624,7 @@ function MonthView({
   )
 }
 
-function AgendaView({ exams, blocks = [], examinerName, examinerColor, canBook, filtered = false, onNew, onExamClick, onBlockClick }) {
+function AgendaView({ exams, blocks = [], examinerName, examinerColor, canBook, filtered = false, flashId = null, onNew, onExamClick, onBlockClick }) {
   const rows = useMemo(() => [
     ...exams.map((ex) => ({ kind: 'exam', k: `${ex.exam_date} ${ex.exam_time || ''}`, ex })),
     ...blocks.map((b) => ({ kind: 'private', k: `${b.block_date} ${b.start_time || ''}`, b })),
@@ -538,7 +633,7 @@ function AgendaView({ exams, blocks = [], examinerName, examinerColor, canBook, 
     return (
       <div className="cal-empty">
         {filtered ? (
-          <>No exams for this examiner.</>
+          <>No exams match this filter.</>
         ) : canBook ? (
           <>No bookings yet. <button className="link" onClick={onNew}>Create the first one →</button></>
         ) : (
@@ -570,7 +665,7 @@ function AgendaView({ exams, blocks = [], examinerName, examinerColor, canBook, 
           </div>
         </div>
       ) : ((ex) => (
-        <div key={ex.id} className="agenda-row" onClick={() => onExamClick(ex)}>
+        <div key={ex.id} data-exam-id={ex.id} className={`agenda-row${flashId === ex.id ? ' flash' : ''}`} onClick={() => onExamClick(ex)}>
           <div className="agenda-when">
             <span className="agenda-date">{format(parseISO(ex.exam_date), 'EEE, MMM d')}</span>
             <span className="agenda-time">{ex.exam_time?.slice(0, 5)}</span>
@@ -597,7 +692,7 @@ function AgendaView({ exams, blocks = [], examinerName, examinerColor, canBook, 
 // Print-only: a day-by-day list of one month — everyone, or the one
 // examiner the calendar is narrowed to. Hidden on screen; "Print <Month>"
 // shows only this (see .sched-print in calendar.css).
-function SchedulePrint({ exams, blocks = [], cursor, only, examinerName }) {
+function SchedulePrint({ exams, blocks = [], cursor, only, org = '', examinerName }) {
   const ym = format(cursor, 'yyyy-MM')
   const days = useMemo(() => {
     const map = {}
@@ -617,7 +712,7 @@ function SchedulePrint({ exams, blocks = [], cursor, only, examinerName }) {
     }))
   }, [exams, blocks, ym])
   const total = days.reduce((n, d) => n + d.rows.filter((r) => !r.private).length, 0)
-  const who = only ? only.name : 'All examiners'
+  const who = only ? `${only.name}${org ? ` · ${org}` : ''}` : org || 'All examiners'
   return (
     <section className="sched-print" aria-hidden="true">
       <header className="sp-head">
