@@ -233,15 +233,16 @@ export const ORG_DIRECTORY = {
   Tazewell: { code: 'D43' },
   'Newport News': {
     code: 'D19',
-    billTo: ['Newport News Probation & Parole (D19)', '250 Warwick Blvd.', 'Newport News, VA 23607'],
+    // 2506 confirmed by Cris 11/17/2026 (was 250 — dropped digit).
+    billTo: ['Newport News Probation & Parole (D19)', '2506 Warwick Blvd.', 'Newport News, VA 23607'],
     emails: ['Carmen.Rodriguez@vadoc.virginia.gov', 'Maxine.lee@vadoc.virginia.gov'],
   },
-  // Added 11/10/2026 per Cris. District number + office address from the
-  // VADOC Facilities & Offices page. No billing email yet — add here when
-  // SAPPS has one (invoices still generate; the email just has no recipient).
+  // Added 11/10/2026 per Cris. Address + billing contact confirmed by Cris
+  // 11/17/2026 (Washington Complex; SAPPS corresponds with Stacey Owens).
   Suffolk: {
     code: 'D6',
-    billTo: ['Suffolk Probation & Parole (D6)', '425 West Washington St., Suite 5', 'Suffolk, VA 23434'],
+    billTo: ['Suffolk Probation & Parole (D6)', 'Washington Complex', '425 West Washington St., Suite 5', 'Suffolk, VA 23434'],
+    emails: ['Stacey.Owens@vadoc.virginia.gov'],
   },
 
   'Center for Clinical and Forensic Services': {
