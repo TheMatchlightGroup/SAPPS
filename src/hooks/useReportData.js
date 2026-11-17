@@ -72,9 +72,23 @@ export function useReportEditor(examId) {
     ])
 
     if (examRes.error) { setError(examRes.error.message); setLoading(false); return }
-    if (!examRes.data) { setError('Exam not found (it may have been deleted).'); setLoading(false); return }
 
-    const ex = examRes.data
+    // Examiners can only read their OWN exams (calendar privacy), but every
+    // report is readable by everyone (the library). Opening a colleague's
+    // report used to stop here with "Exam not found (it may have been
+    // deleted)". The report row carries everything the editor needs, so
+    // build a read-only stand-in from it instead.
+    let ex = examRes.data
+    if (!ex && reportRes.data) {
+      const r = reportRes.data
+      ex = {
+        id: r.exam_id, client_name: r.client_name, exam_date: r.exam_date, exam_time: null,
+        exam_type: r.exam_type, organization: r.organization, status: 'completed',
+        examiner_id: r.examiner_id, fromReport: true,
+      }
+    }
+    if (!ex) { setError('This exam is no longer on the calendar, so its report can’t be opened.'); setLoading(false); return }
+
     const [userRes, addrRes] = await Promise.all([
       ex.examiner_id
         ? supabase.from('users').select('name').eq('id', ex.examiner_id).maybeSingle()
@@ -95,7 +109,7 @@ export function useReportEditor(examId) {
       }
 
     setExam(ex)
-    setExaminerName(userRes.data?.name || '')
+    setExaminerName(userRes.data?.name || reportRes.data?.examiner_name || '')
     setOrgAddress(addrRes.data?.address || '')
     setTemplate(matched)
     setTemplates(templates)

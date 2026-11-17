@@ -346,7 +346,9 @@ function ReportEditorPage({ examId }) {
           {flash && <span className="re-saved">{flash}</span>}
         </div>
         <div className="re-buttons">
-          {!readOnly && !report && (
+          {/* Offered until the report is final. It used to vanish as soon as the
+              first autosave created a draft — a few seconds after typing. */}
+          {!readOnly && status !== 'final' && (
             <button className="btn btn-text" onClick={() => setPanel('copy')} disabled={busy}>Copy from a previous report…</button>
           )}
           {report && <button className="btn btn-text" onClick={() => setPanel('history')}>History</button>}
@@ -463,7 +465,7 @@ function ReportEditorPage({ examId }) {
           onRestore={(v) => loadContent(v, 'restore')} onClose={() => setPanel(null)} />
       )}
       {panel === 'copy' && (
-        <CopyPanel find={findPreviousReports} defaultQuery={(exam.client_name || '').split(' ').slice(-1)[0]}
+        <CopyPanel find={findPreviousReports} hasText={Boolean(report && report.status !== 'waived')} defaultQuery={(exam.client_name || '').split(' ').slice(-1)[0]}
           onPick={(r) => {
             // Keep this exam's own name/date/time; copy the rest.
             const keep = {}
@@ -523,7 +525,7 @@ function HistoryPanel({ loadVersions, canRestore, current, onRestore, onClose })
   )
 }
 
-function CopyPanel({ find, defaultQuery, onPick, onClose }) {
+function CopyPanel({ find, hasText, defaultQuery, onPick, onClose }) {
   const [q, setQ] = useState(defaultQuery || '')
   const [rows, setRows] = useState(null)
   useEffect(() => {
@@ -542,7 +544,9 @@ function CopyPanel({ find, defaultQuery, onPick, onClose }) {
             : rows.length === 0 ? <p className="mnote">No reports match.</p>
               : rows.map((r) => (
                 <button key={r.id} className="rp-row" onClick={() => {
-                  if (window.confirm(`Copy ${r.client_name}'s ${format(parseISO(r.exam_date), 'M/d/yyyy')} report into this one?`)) onPick(r)
+                  const msg = `Copy ${r.client_name}'s ${format(parseISO(r.exam_date), 'M/d/yyyy')} report into this one?` +
+                    (hasText ? '\n\nThis replaces what is in this report now. The current text is kept in History.' : '')
+                  if (window.confirm(msg)) onPick(r)
                 }}>
                   <div className="rp-row-main">
                     <span className="rp-row-name">{r.client_name}</span>
